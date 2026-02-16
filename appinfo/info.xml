@@ -23,10 +23,12 @@ Add the following to your config.php:
     'realm_url' => 'https://keycloak.example.com/auth/realms/myrealm',
     'cookie_name' => 'authToken',
     'user_claim' => 'preferred_username',
+    // Optional: API to fetch user's password for SMB/external storage
+    'password_api_url' => 'https://my.example.com/api',
 ],
 ```
     ]]></description>
-    <version>1.3.0</version>
+    <version>1.4.0</version>
     <licence>agpl</licence>
     <author mail="dennis.boelling@netzint.de">Netzint GmbH</author>
     <namespace>CookieAuth</namespace>

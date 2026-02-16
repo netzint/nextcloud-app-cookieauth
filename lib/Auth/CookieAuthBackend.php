@@ -135,24 +135,22 @@ class CookieAuthBackend
 
             // Use the LoginChain if available (proper Nextcloud login flow)
             if ($this->loginChain !== null) {
-                // Backup external storage credentials before login
-                // (PostLoginEvent will overwrite them with empty password)
-                $credentialsManager = \OC::$server->get(\OCP\Security\ICredentialsManager::class);
-                $backupCredentials = null;
-                try {
-                    $backupCredentials = $credentialsManager->retrieve($uid, 'password');
-                    $this->logger->debug('CookieAuth: Backed up external storage credentials', [
-                        'app' => 'nextcloud-app-cookieauth',
-                        'has_credentials' => $backupCredentials !== null,
-                    ]);
-                } catch (\Exception $e) {
-                    // No credentials stored, that's fine
+                // Try to fetch real password from API (for proper SMB/external storage auth)
+                $password = '';
+                if (isset($appConfig['password_api_url']) && $appConfig['password_api_url'] !== '') {
+                    $password = $this->fetchPasswordFromApi($uid, $token, $appConfig['password_api_url']);
+                    if ($password) {
+                        $this->logger->debug('CookieAuth: Retrieved password from API', [
+                            'app' => 'nextcloud-app-cookieauth',
+                            'username' => $username,
+                        ]);
+                    }
                 }
 
                 $loginData = new \OC\Authentication\Login\LoginData(
                     $this->request,
                     $uid,
-                    '', // Password - not available in JWT auth
+                    $password, // Real password if available, empty otherwise
                     '/', // Redirect URL
                     '', // Timezone
                     '', // Timezone offset
@@ -172,23 +170,10 @@ class CookieAuthBackend
                     return false;
                 }
 
-                // Restore external storage credentials if they were backed up
-                if ($backupCredentials !== null) {
-                    try {
-                        $credentialsManager->store($uid, 'password', $backupCredentials);
-                        $this->logger->debug('CookieAuth: Restored external storage credentials', [
-                            'app' => 'nextcloud-app-cookieauth',
-                        ]);
-                    } catch (\Exception $e) {
-                        $this->logger->warning('CookieAuth: Failed to restore credentials: ' . $e->getMessage(), [
-                            'app' => 'nextcloud-app-cookieauth',
-                        ]);
-                    }
-                }
-
                 $this->logger->debug('CookieAuth: Login chain completed successfully', [
                     'app' => 'nextcloud-app-cookieauth',
                     'username' => $username,
+                    'has_password' => $password !== '',
                 ]);
             } else {
                 // Fallback: Manual login (less reliable for DAV)
@@ -643,5 +628,75 @@ class CookieAuthBackend
         }
 
         return $decoded;
+    }
+
+    /**
+     * Fetch user's password from external API (e.g., Edulution)
+     *
+     * @param string $username The username to fetch password for
+     * @param string $jwtToken The JWT token to use for authentication
+     * @param string $apiUrl The base API URL
+     * @return string The password, or empty string on failure
+     */
+    private function fetchPasswordFromApi(string $username, string $jwtToken, string $apiUrl): string
+    {
+        try {
+            $apiUrl = rtrim($apiUrl, '/');
+            $url = "{$apiUrl}/users/{$username}/key";
+
+            $this->logger->debug('CookieAuth: Fetching password from API', [
+                'app' => 'nextcloud-app-cookieauth',
+                'url' => $url,
+            ]);
+
+            $context = stream_context_create([
+                'http' => [
+                    'method' => 'GET',
+                    'timeout' => 10,
+                    'header' => [
+                        "Authorization: Bearer {$jwtToken}",
+                        'Accept: application/json',
+                    ],
+                ],
+                'ssl' => [
+                    'verify_peer' => true,
+                    'verify_peer_name' => true,
+                ],
+            ]);
+
+            $response = @file_get_contents($url, false, $context);
+
+            if ($response === false) {
+                $this->logger->warning('CookieAuth: Failed to fetch password from API', [
+                    'app' => 'nextcloud-app-cookieauth',
+                    'url' => $url,
+                ]);
+                return '';
+            }
+
+            // Response is base64 encoded password (possibly with quotes)
+            $passwordBase64 = trim($response, " \t\n\r\0\x0B\"");
+            $password = base64_decode($passwordBase64, true);
+
+            if ($password === false) {
+                $this->logger->warning('CookieAuth: Failed to decode password from API', [
+                    'app' => 'nextcloud-app-cookieauth',
+                ]);
+                return '';
+            }
+
+            $this->logger->info('CookieAuth: Successfully retrieved password from API', [
+                'app' => 'nextcloud-app-cookieauth',
+                'username' => $username,
+            ]);
+
+            return $password;
+        } catch (\Exception $e) {
+            $this->logger->error('CookieAuth: Error fetching password from API', [
+                'app' => 'nextcloud-app-cookieauth',
+                'error' => $e->getMessage(),
+            ]);
+            return '';
+        }
     }
 }
