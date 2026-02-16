@@ -14,6 +14,7 @@ use OCP\IConfig;
 use OCP\IRequest;
 use OCP\ISession;
 use OCP\IUserManager;
+use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
 
 class Application extends App implements IBootstrap
@@ -38,13 +39,52 @@ class Application extends App implements IBootstrap
             );
         });
 
-        // Register the middleware that handles auto-login
+        // Register the middleware that handles auto-login for app routes
         $context->registerMiddleware(CookieAuthMiddleware::class);
     }
 
     public function boot(IBootContext $context): void
     {
-        // Auto-login is handled by the middleware, not here
-        // This prevents duplicate login attempts
+        $serverContainer = $context->getServerContainer();
+
+        // Get user session to check if already logged in
+        $userSession = $serverContainer->get(IUserSession::class);
+
+        // Skip if already logged in
+        if ($userSession->isLoggedIn()) {
+            return;
+        }
+
+        // Skip for CLI requests
+        if (php_sapi_name() === 'cli') {
+            return;
+        }
+
+        // Try auto-login early, before Nextcloud redirects to login page
+        $authBackend = $serverContainer->get(CookieAuthBackend::class);
+        $loginSuccess = $authBackend->tryAutoLogin($userSession);
+
+        // If login was successful and we're on the login page, redirect to home
+        if ($loginSuccess) {
+            $request = $serverContainer->get(IRequest::class);
+            $pathInfo = $request->getPathInfo();
+
+            // If on login page, redirect to the requested URL or home
+            if (str_starts_with($pathInfo, '/login')) {
+                $redirectUrl = $request->getParam('redirect_url');
+                if ($redirectUrl) {
+                    // Validate redirect URL to prevent open redirects
+                    $redirectUrl = urldecode($redirectUrl);
+                    if (!str_starts_with($redirectUrl, '/')) {
+                        $redirectUrl = '/';
+                    }
+                } else {
+                    $redirectUrl = '/';
+                }
+
+                header('Location: ' . $redirectUrl);
+                exit();
+            }
+        }
     }
 }
