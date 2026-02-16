@@ -151,7 +151,7 @@ class CookieAuthBackend
                     $this->request,
                     $uid,
                     $password, // Real password if available, empty otherwise
-                    '/', // Redirect URL
+                    false, // rememberLogin
                     '', // Timezone
                     '', // Timezone offset
                 );
