@@ -135,20 +135,30 @@ class CookieAuthBackend
 
             // Use the LoginChain if available (proper Nextcloud login flow)
             if ($this->loginChain !== null) {
+                // Manually set up user session first (normally done by CompleteLoginCommand)
+                // We skip CompleteLoginCommand to avoid PostLoginEvent which overwrites
+                // stored external storage credentials with empty password.
+                $userSession->setUser($user);
+                $this->session->set('loginname', $uid);
+                $this->session->set('user_id', $uid);
+                $this->session->set('last-password-confirm', time());
+
                 $loginData = new \OC\Authentication\Login\LoginData(
                     $this->request,
                     $uid,
-                    '', // Password - not validated by the chain
+                    '', // Password - not available in JWT auth
                     '/', // Redirect URL
                     '', // Timezone
                     '', // Timezone offset
                 );
 
-                // Pre-populate with the user (normally done by UserCommand)
+                // Pre-populate with the user
                 $loginData->setUser($user);
 
-                // Process through the login chain
-                $result = $this->loginChain->process($loginData);
+                // Use passwordless login to preserve existing external storage credentials.
+                // This skips CompleteLoginCommand which would trigger PostLoginEvent
+                // and overwrite stored SMB/external storage credentials with empty password.
+                $result = $this->loginChain->processPasswordless($loginData);
 
                 if (!$result->isSuccess()) {
                     $this->logger->warning('CookieAuth: Login chain failed', [
@@ -158,7 +168,10 @@ class CookieAuthBackend
                     return false;
                 }
 
-                $this->logger->debug('CookieAuth: Login chain completed successfully', [
+                // Update last login timestamp (normally done by CompleteLoginCommand)
+                $user->updateLastLoginTimestamp();
+
+                $this->logger->debug('CookieAuth: Passwordless login completed successfully', [
                     'app' => 'nextcloud-app-cookieauth',
                     'username' => $username,
                 ]);
