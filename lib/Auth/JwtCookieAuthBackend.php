@@ -1,0 +1,529 @@
+<?php
+
+declare(strict_types=1);
+
+namespace OCA\JwtCookieAuth\Auth;
+
+use OCP\IConfig;
+use OCP\IRequest;
+use OCP\ISession;
+use OCP\IUserManager;
+use OCP\IUserSession;
+use Psr\Log\LoggerInterface;
+
+class JwtCookieAuthBackend
+{
+    private const SESSION_KEY = 'jwtcookieauth_authenticated';
+    private const SESSION_TOKEN_HASH = 'jwtcookieauth_token_hash';
+    private const SESSION_TOKEN_EXP = 'jwtcookieauth_token_exp';
+    private const CACHE_KEY_PUBLIC_KEY = 'jwtcookieauth_cached_public_key';
+    private const CACHE_KEY_PUBLIC_KEY_TIME = 'jwtcookieauth_cached_public_key_time';
+    private const CACHE_TTL = 3600; // Cache public key for 1 hour
+
+    public function __construct(
+        private IUserManager $userManager,
+        private IConfig $config,
+        private LoggerInterface $logger,
+        private IRequest $request,
+        private ISession $session,
+    ) {
+    }
+
+    /**
+     * Try to auto-login the user based on JWT cookie
+     */
+    public function tryAutoLogin(IUserSession $userSession): bool
+    {
+        $appConfig = $this->getAppConfig();
+
+        if (!$appConfig) {
+            return false;
+        }
+
+        // Get JWT from cookie
+        $token = $this->getTokenFromCookie($appConfig['cookie_name']);
+
+        if (!$token) {
+            $this->logger->debug('JwtCookieAuth: No token found in cookie', ['app' => 'jwtcookieauth']);
+            return false;
+        }
+
+        // Check if we already processed this token in this session
+        $tokenHash = hash('sha256', $token);
+        $sessionTokenHash = $this->session->get(self::SESSION_TOKEN_HASH);
+        $sessionTokenExp = $this->session->get(self::SESSION_TOKEN_EXP);
+
+        // Validate session: check if token matches AND hasn't expired
+        if ($this->session->exists(self::SESSION_KEY) &&
+            $sessionTokenHash === $tokenHash &&
+            $sessionTokenExp !== null &&
+            $sessionTokenExp > time()) {
+            $this->logger->debug('JwtCookieAuth: Token already processed in this session', ['app' => 'jwtcookieauth']);
+            return true;
+        }
+
+        // Validate JWT
+        $payload = $this->validateToken($token, $appConfig);
+
+        if (!$payload) {
+            // Clear any existing session data on validation failure
+            $this->clearSessionData();
+            return false;
+        }
+
+        // Extract username from payload
+        $username = $this->extractUsername($payload, $appConfig);
+
+        if (!$username) {
+            $this->logger->warning('JwtCookieAuth: Could not extract username from token', ['app' => 'jwtcookieauth']);
+            return false;
+        }
+
+        // Find user in Nextcloud
+        $user = $this->userManager->get($username);
+
+        // If not found by username, try by email
+        if (!$user && isset($appConfig['fallback_to_email']) && $appConfig['fallback_to_email']) {
+            $user = $this->findUserByEmail($payload);
+        }
+
+        if (!$user) {
+            $this->logger->warning('JwtCookieAuth: User not found in Nextcloud', [
+                'app' => 'jwtcookieauth',
+                'username' => $username,
+            ]);
+            return false;
+        }
+
+        // Check if user is enabled
+        if (!$user->isEnabled()) {
+            $this->logger->warning('JwtCookieAuth: User is disabled', [
+                'app' => 'jwtcookieauth',
+                'username' => $username,
+            ]);
+            return false;
+        }
+
+        // Login the user
+        $result = $userSession->setUser($user);
+
+        if ($result !== false) {
+            // Mark session as authenticated via JWT
+            $this->session->set(self::SESSION_KEY, true);
+            $this->session->set(self::SESSION_TOKEN_HASH, $tokenHash);
+            // Store token expiration for session validation
+            $this->session->set(self::SESSION_TOKEN_EXP, $payload['exp'] ?? (time() + 3600));
+
+            $this->logger->info('JwtCookieAuth: User logged in successfully', [
+                'app' => 'jwtcookieauth',
+                'username' => $username,
+            ]);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Find user by email from JWT payload
+     */
+    private function findUserByEmail(array $payload): ?\OCP\IUser
+    {
+        $email = $payload['email'] ?? null;
+        if (!$email) {
+            return null;
+        }
+
+        $users = $this->userManager->getByEmail($email);
+
+        if (count($users) === 1) {
+            return $users[0];
+        }
+
+        if (count($users) > 1) {
+            $this->logger->warning('JwtCookieAuth: Multiple users found with same email, cannot auto-login', [
+                'app' => 'jwtcookieauth',
+                'email' => $email,
+                'user_count' => count($users),
+            ]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Clear JWT session data
+     */
+    private function clearSessionData(): void
+    {
+        $this->session->remove(self::SESSION_KEY);
+        $this->session->remove(self::SESSION_TOKEN_HASH);
+        $this->session->remove(self::SESSION_TOKEN_EXP);
+    }
+
+    /**
+     * Get app configuration from config.php
+     */
+    private function getAppConfig(): ?array
+    {
+        $config = $this->config->getSystemValue('jwtcookieauth', null);
+
+        if (!$config || !is_array($config)) {
+            $this->logger->debug('JwtCookieAuth: No configuration found', ['app' => 'jwtcookieauth']);
+            return null;
+        }
+
+        // Check if realm_url is provided (auto-fetch mode)
+        $hasRealmUrl = isset($config['realm_url']) && $config['realm_url'] !== '';
+        $hasPublicKey = isset($config['public_key']) && $config['public_key'] !== '';
+
+        // Must have either realm_url or public_key
+        if (!$hasRealmUrl && !$hasPublicKey) {
+            $this->logger->error('JwtCookieAuth: Missing required config: realm_url or public_key', ['app' => 'jwtcookieauth']);
+            return null;
+        }
+
+        // Validate other required config
+        $required = ['cookie_name', 'user_claim'];
+        foreach ($required as $key) {
+            if (!isset($config[$key]) || $config[$key] === '') {
+                $this->logger->error("JwtCookieAuth: Missing required config: $key", ['app' => 'jwtcookieauth']);
+                return null;
+            }
+        }
+
+        // Set default algorithm if not provided
+        if (!isset($config['algorithm']) || $config['algorithm'] === '') {
+            $config['algorithm'] = 'RS256';
+        }
+
+        // If realm_url is provided, derive issuer from it if not set
+        if ($hasRealmUrl && (!isset($config['issuer']) || $config['issuer'] === '')) {
+            $config['issuer'] = $config['realm_url'];
+        }
+
+        return $config;
+    }
+
+    /**
+     * Extract JWT from cookie
+     */
+    private function getTokenFromCookie(string $cookieName): ?string
+    {
+        $cookie = $this->request->getCookie($cookieName);
+
+        if (!$cookie || $cookie === '') {
+            return null;
+        }
+
+        return $cookie;
+    }
+
+    /**
+     * Validate JWT token and return payload
+     */
+    private function validateToken(string $token, array $config): ?array
+    {
+        try {
+            // Split token into parts
+            $parts = explode('.', $token);
+            if (count($parts) !== 3) {
+                $this->logger->warning('JwtCookieAuth: Invalid token format', ['app' => 'jwtcookieauth']);
+                return null;
+            }
+
+            [$headerB64, $payloadB64, $signatureB64] = $parts;
+
+            // Decode header
+            $headerJson = $this->base64UrlDecode($headerB64);
+            if ($headerJson === null) {
+                $this->logger->warning('JwtCookieAuth: Failed to decode token header', ['app' => 'jwtcookieauth']);
+                return null;
+            }
+
+            $header = json_decode($headerJson, true);
+            if (!$header || !isset($header['alg'])) {
+                $this->logger->warning('JwtCookieAuth: Invalid token header', ['app' => 'jwtcookieauth']);
+                return null;
+            }
+
+            // Check algorithm
+            $expectedAlg = $config['algorithm'];
+            if ($header['alg'] !== $expectedAlg) {
+                $this->logger->warning('JwtCookieAuth: Algorithm mismatch', [
+                    'app' => 'jwtcookieauth',
+                    'expected' => $expectedAlg,
+                    'got' => $header['alg'],
+                ]);
+                return null;
+            }
+
+            // Decode payload
+            $payloadJson = $this->base64UrlDecode($payloadB64);
+            if ($payloadJson === null) {
+                $this->logger->warning('JwtCookieAuth: Failed to decode token payload', ['app' => 'jwtcookieauth']);
+                return null;
+            }
+
+            $payload = json_decode($payloadJson, true);
+            if (!$payload) {
+                $this->logger->warning('JwtCookieAuth: Invalid token payload', ['app' => 'jwtcookieauth']);
+                return null;
+            }
+
+            // Check expiration
+            if (isset($payload['exp']) && $payload['exp'] < time()) {
+                $this->logger->warning('JwtCookieAuth: Token expired', ['app' => 'jwtcookieauth']);
+                return null;
+            }
+
+            // Check not before
+            if (isset($payload['nbf']) && $payload['nbf'] > time()) {
+                $this->logger->warning('JwtCookieAuth: Token not yet valid', ['app' => 'jwtcookieauth']);
+                return null;
+            }
+
+            // Check issuer if configured
+            if (isset($config['issuer']) && $config['issuer'] !== '') {
+                if (!isset($payload['iss']) || $payload['iss'] !== $config['issuer']) {
+                    $this->logger->warning('JwtCookieAuth: Issuer mismatch', [
+                        'app' => 'jwtcookieauth',
+                        'expected' => $config['issuer'],
+                        'got' => $payload['iss'] ?? 'not set',
+                    ]);
+                    return null;
+                }
+            }
+
+            // Verify signature
+            if (!$this->verifySignature($headerB64, $payloadB64, $signatureB64, $config)) {
+                $this->logger->warning('JwtCookieAuth: Signature verification failed', ['app' => 'jwtcookieauth']);
+                return null;
+            }
+
+            return $payload;
+        } catch (\Exception $e) {
+            $this->logger->error('JwtCookieAuth: Token validation error', [
+                'app' => 'jwtcookieauth',
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Get the public key - either from config or fetched from Keycloak realm
+     */
+    private function getPublicKey(array $config): ?string
+    {
+        // If public_key is directly provided, use it
+        if (isset($config['public_key']) && $config['public_key'] !== '') {
+            $publicKeyPath = $config['public_key'];
+
+            // Key is provided directly as PEM string
+            if (str_starts_with($publicKeyPath, '-----BEGIN')) {
+                return $publicKeyPath;
+            }
+
+            // Key is a file path
+            if (file_exists($publicKeyPath)) {
+                $publicKey = file_get_contents($publicKeyPath);
+                if ($publicKey === false) {
+                    $this->logger->error('JwtCookieAuth: Could not read public key file', [
+                        'app' => 'jwtcookieauth',
+                        'path' => $publicKeyPath,
+                    ]);
+                    return null;
+                }
+                return $publicKey;
+            }
+
+            $this->logger->error('JwtCookieAuth: Public key file not found', [
+                'app' => 'jwtcookieauth',
+                'path' => $publicKeyPath,
+            ]);
+            return null;
+        }
+
+        // Fetch from realm_url
+        if (isset($config['realm_url']) && $config['realm_url'] !== '') {
+            return $this->fetchPublicKeyFromRealm($config['realm_url']);
+        }
+
+        return null;
+    }
+
+    /**
+     * Fetch public key from Keycloak realm URL
+     * Uses caching to avoid HTTP requests on every authentication
+     */
+    private function fetchPublicKeyFromRealm(string $realmUrl): ?string
+    {
+        // Check cache first
+        $cachedKey = $this->config->getAppValue('jwtcookieauth', self::CACHE_KEY_PUBLIC_KEY, '');
+        $cacheTime = (int) $this->config->getAppValue('jwtcookieauth', self::CACHE_KEY_PUBLIC_KEY_TIME, '0');
+
+        if ($cachedKey !== '' && $cacheTime > 0 && (time() - $cacheTime) < self::CACHE_TTL) {
+            $this->logger->debug('JwtCookieAuth: Using cached public key', ['app' => 'jwtcookieauth']);
+            return $cachedKey;
+        }
+
+        // Fetch from Keycloak
+        $this->logger->info('JwtCookieAuth: Fetching public key from realm', [
+            'app' => 'jwtcookieauth',
+            'realm_url' => $realmUrl,
+        ]);
+
+        $realmUrl = rtrim($realmUrl, '/');
+
+        // Try to fetch realm info
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 10,
+                'header' => 'Accept: application/json',
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+
+        $response = @file_get_contents($realmUrl, false, $context);
+
+        if ($response === false) {
+            $this->logger->error('JwtCookieAuth: Failed to fetch realm info', [
+                'app' => 'jwtcookieauth',
+                'realm_url' => $realmUrl,
+            ]);
+            return null;
+        }
+
+        $realmInfo = json_decode($response, true);
+
+        if (!$realmInfo || !isset($realmInfo['public_key'])) {
+            $this->logger->error('JwtCookieAuth: Invalid realm response or missing public_key', [
+                'app' => 'jwtcookieauth',
+                'realm_url' => $realmUrl,
+            ]);
+            return null;
+        }
+
+        // Convert to PEM format
+        $publicKey = "-----BEGIN PUBLIC KEY-----\n" .
+            chunk_split($realmInfo['public_key'], 64, "\n") .
+            "-----END PUBLIC KEY-----";
+
+        // Cache the key
+        $this->config->setAppValue('jwtcookieauth', self::CACHE_KEY_PUBLIC_KEY, $publicKey);
+        $this->config->setAppValue('jwtcookieauth', self::CACHE_KEY_PUBLIC_KEY_TIME, (string) time());
+
+        $this->logger->info('JwtCookieAuth: Successfully fetched and cached public key', ['app' => 'jwtcookieauth']);
+
+        return $publicKey;
+    }
+
+    /**
+     * Verify JWT signature
+     */
+    private function verifySignature(string $headerB64, string $payloadB64, string $signatureB64, array $config): bool
+    {
+        $data = "$headerB64.$payloadB64";
+        $signature = $this->base64UrlDecode($signatureB64);
+
+        if ($signature === null) {
+            $this->logger->error('JwtCookieAuth: Failed to decode signature', ['app' => 'jwtcookieauth']);
+            return false;
+        }
+
+        // Get public key (from config or fetched from realm)
+        $publicKey = $this->getPublicKey($config);
+
+        if (!$publicKey) {
+            $this->logger->error('JwtCookieAuth: Could not get public key', ['app' => 'jwtcookieauth']);
+            return false;
+        }
+
+        $algorithm = $config['algorithm'];
+
+        // Map algorithm to OpenSSL constant
+        $algMap = [
+            'RS256' => OPENSSL_ALGO_SHA256,
+            'RS384' => OPENSSL_ALGO_SHA384,
+            'RS512' => OPENSSL_ALGO_SHA512,
+        ];
+
+        if (!isset($algMap[$algorithm])) {
+            $this->logger->error('JwtCookieAuth: Unsupported algorithm', [
+                'app' => 'jwtcookieauth',
+                'algorithm' => $algorithm,
+            ]);
+            return false;
+        }
+
+        $key = openssl_pkey_get_public($publicKey);
+        if (!$key) {
+            $this->logger->error('JwtCookieAuth: Invalid public key format', ['app' => 'jwtcookieauth']);
+            return false;
+        }
+
+        $result = openssl_verify($data, $signature, $key, $algMap[$algorithm]);
+
+        if ($result === -1) {
+            $this->logger->error('JwtCookieAuth: OpenSSL verification error', [
+                'app' => 'jwtcookieauth',
+                'error' => openssl_error_string(),
+            ]);
+            return false;
+        }
+
+        return $result === 1;
+    }
+
+    /**
+     * Extract username from JWT payload based on config
+     */
+    private function extractUsername(array $payload, array $config): ?string
+    {
+        $claim = $config['user_claim'];
+
+        // Support nested claims with dot notation (e.g., "user.name")
+        $parts = explode('.', $claim);
+        $value = $payload;
+
+        foreach ($parts as $part) {
+            if (!is_array($value) || !isset($value[$part])) {
+                return null;
+            }
+            $value = $value[$part];
+        }
+
+        if (!is_string($value)) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    /**
+     * Base64 URL decode with proper error handling
+     *
+     * @param string $data Base64 URL encoded string
+     * @return string|null Decoded string or null on failure
+     */
+    private function base64UrlDecode(string $data): ?string
+    {
+        $remainder = strlen($data) % 4;
+        if ($remainder) {
+            $data .= str_repeat('=', 4 - $remainder);
+        }
+
+        $decoded = base64_decode(strtr($data, '-_', '+/'), true);
+
+        if ($decoded === false) {
+            return null;
+        }
+
+        return $decoded;
+    }
+}

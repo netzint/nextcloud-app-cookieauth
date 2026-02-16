@@ -1,0 +1,196 @@
+# JWT Cookie Auth for Nextcloud
+
+A Nextcloud app that enables automatic Single-Sign-On (SSO) when Nextcloud is embedded in an iframe. It reads a JWT token from a configurable cookie, validates it against a public key (e.g., from Keycloak), and automatically logs in the matching Nextcloud user.
+
+## Use Case
+
+This app is perfect for scenarios where:
+- Nextcloud is embedded in an iframe within a portal application
+- The portal uses Keycloak or another OIDC provider for authentication
+- The JWT token is already present as a cookie from the parent application
+- You want seamless SSO without redirecting users through another login flow
+
+## Requirements
+
+- Nextcloud 25 or higher
+- PHP 8.1 or higher
+- A JWT token in a cookie (e.g., from Keycloak)
+- Users must already exist in Nextcloud (matching by username or email)
+
+## Installation
+
+1. Clone/copy this app to your Nextcloud apps directory:
+
+```bash
+cd /var/www/nextcloud/apps
+git clone https://github.com/netzint/nextcloud-jwtcookieauth jwtcookieauth
+```
+
+2. Enable the app:
+
+```bash
+sudo -u www-data php occ app:enable jwtcookieauth
+```
+
+## Configuration
+
+Add the following to your `config/config.php`:
+
+### Option 1: Auto-fetch Public Key from Keycloak (Recommended)
+
+The app can automatically fetch the public key from your Keycloak realm:
+
+```php
+'jwtcookieauth' => [
+    // Keycloak Realm URL - public key is fetched automatically
+    'realm_url' => 'https://my.netzint.de/auth/realms/edulution',
+
+    // Name of the cookie containing the JWT token
+    'cookie_name' => 'authToken',
+
+    // JWT claim to use for matching users
+    'user_claim' => 'preferred_username',
+
+    // Optional: If user not found by username, try matching by email
+    'fallback_to_email' => true,
+],
+```
+
+The public key is cached for 1 hour to minimize HTTP requests.
+
+### Option 2: Manual Public Key Configuration
+
+If you prefer to provide the public key manually:
+
+```php
+'jwtcookieauth' => [
+    // Name of the cookie containing the JWT token
+    'cookie_name' => 'authToken',
+
+    // Path to the public key file (PEM format)
+    // OR the key itself as a string starting with "-----BEGIN"
+    'public_key' => '/etc/nextcloud/keycloak-public-key.pem',
+
+    // JWT signing algorithm (RS256, RS384, RS512) - default: RS256
+    'algorithm' => 'RS256',
+
+    // JWT claim to use for matching users
+    'user_claim' => 'preferred_username',
+
+    // Optional: Expected issuer (for additional validation)
+    'issuer' => 'https://my.netzint.de/auth/realms/edulution',
+
+    // Optional: If user not found by username, try matching by email
+    'fallback_to_email' => true,
+],
+```
+
+### Configuration Options
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `realm_url` | Yes* | - | Keycloak realm URL (auto-fetches public key) |
+| `public_key` | Yes* | - | Path to PEM file or PEM string |
+| `cookie_name` | Yes | - | Name of the cookie containing the JWT |
+| `user_claim` | Yes | - | JWT claim for username (e.g., `preferred_username`) |
+| `algorithm` | No | `RS256` | JWT algorithm (RS256, RS384, RS512) |
+| `issuer` | No | realm_url | Expected JWT issuer |
+| `fallback_to_email` | No | `false` | Try email lookup if username not found |
+
+*Either `realm_url` OR `public_key` must be provided.
+
+## How It Works
+
+```
+Portal (with Keycloak)          Nextcloud (iframe)
+       │                               │
+       │  1. User logs in              │
+       │  2. Keycloak sets authToken   │
+       │     cookie                    │
+       │                               │
+       │  3. Portal loads iframe       │
+       │ ─────────────────────────────>│
+       │     (cookie is sent)          │
+       │                               │  4. App reads cookie
+       │                               │  5. Validates JWT signature
+       │                               │  6. Extracts username
+       │                               │  7. Logs in Nextcloud user
+       │                               │
+       │<───────────────────────────── │  8. Returns authenticated page
+```
+
+## Cookie Requirements
+
+For the cookie to be sent with iframe requests:
+
+1. **Same-Site**: `SameSite=None; Secure` if Nextcloud is on a different subdomain
+2. **Domain**: Cookie domain must include the Nextcloud domain
+3. **HTTPS**: Both portal and Nextcloud must use HTTPS
+
+Example cookie:
+```
+Set-Cookie: authToken=eyJhbGci...; Path=/; Domain=.netzint.de; Secure; HttpOnly; SameSite=None
+```
+
+## User Matching
+
+Users must exist in Nextcloud before auto-login. The app matches by:
+
+1. **Primary**: The claim specified in `user_claim` (e.g., `preferred_username`)
+2. **Fallback** (if enabled): The `email` claim
+
+Provision users via:
+- LDAP synchronization
+- Nextcloud User Provisioning API
+- Manual creation
+
+## Debugging
+
+Check logs:
+```bash
+tail -f /var/www/nextcloud/data/nextcloud.log | grep jwtcookieauth
+```
+
+Status endpoint:
+```
+GET /apps/jwtcookieauth/status
+```
+
+Response:
+```json
+{
+  "authenticated": true,
+  "user": {
+    "uid": "dennis.boelling",
+    "displayName": "Dennis Boelling",
+    "email": "dennis.boelling@netzint.de"
+  }
+}
+```
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| "User not found" | Check user exists in Nextcloud, verify `user_claim` |
+| "Signature verification failed" | Check public key, verify algorithm |
+| "Token expired" | Normal - user needs fresh token from portal |
+| "Issuer mismatch" | Check `issuer` config matches JWT |
+| Cookie not sent | Check `SameSite=None; Secure`, verify domain |
+| "Failed to fetch realm info" | Check `realm_url` is accessible from server |
+
+## Security
+
+- Always use HTTPS
+- Validate the issuer
+- Token expiration is enforced (`exp` and `nbf` claims)
+- Public key is cached securely in Nextcloud database
+- Session cleared on token validation failure
+
+## License
+
+AGPL-3.0-or-later
+
+## Credits
+
+Developed by Netzint GmbH for edulution.io
