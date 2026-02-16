@@ -94,6 +94,9 @@ class Application extends App implements IBootstrap
 
         $request = $serverContainer->get(IRequest::class);
         $pathInfo = $request->getPathInfo();
+        $logger = $serverContainer->get(\Psr\Log\LoggerInterface::class);
+
+        $logger->debug('CookieAuth: Boot - pathInfo: ' . $pathInfo, ['app' => 'nextcloud-app-cookieauth']);
 
         // Skip logout to allow proper logout
         if (str_starts_with($pathInfo, '/logout')) {
@@ -104,8 +107,10 @@ class Application extends App implements IBootstrap
         $authBackend = $serverContainer->get(CookieAuthBackend::class);
         $loginSuccess = $authBackend->tryAutoLogin($userSession);
 
+        $logger->debug('CookieAuth: Boot - loginSuccess: ' . ($loginSuccess ? 'true' : 'false') . ', pathInfo: ' . $pathInfo, ['app' => 'nextcloud-app-cookieauth']);
+
         // If login was successful and we're on the login page, redirect to home
-        if ($loginSuccess && str_starts_with($pathInfo, '/login')) {
+        if ($loginSuccess && (str_starts_with($pathInfo, '/login') || $pathInfo === '')) {
             $redirectUrl = $request->getParam('redirect_url');
             if ($redirectUrl) {
                 $redirectUrl = urldecode($redirectUrl);
