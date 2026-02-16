@@ -30,15 +30,21 @@ class Application extends App implements IBootstrap
     public function register(IRegistrationContext $context): void
     {
         // Register the LoginChain (uses Nextcloud's internal login commands)
+        // Wrapped in try-catch because internal classes may not exist in all NC versions
         $context->registerService(LoginChain::class, function ($c) {
-            return new LoginChain(
-                $c->get(\OC\Authentication\Login\PreLoginHookCommand::class),
-                $c->get(\OC\Authentication\Login\CompleteLoginCommand::class),
-                $c->get(\OC\Authentication\Login\CreateSessionTokenCommand::class),
-                $c->get(\OC\Authentication\Login\ClearLostPasswordTokensCommand::class),
-                $c->get(\OC\Authentication\Login\UpdateLastPasswordConfirmCommand::class),
-                $c->get(\OC\Authentication\Login\FinishRememberedLoginCommand::class),
-            );
+            try {
+                return new LoginChain(
+                    $c->get(\OC\Authentication\Login\PreLoginHookCommand::class),
+                    $c->get(\OC\Authentication\Login\CompleteLoginCommand::class),
+                    $c->get(\OC\Authentication\Login\CreateSessionTokenCommand::class),
+                    $c->get(\OC\Authentication\Login\ClearLostPasswordTokensCommand::class),
+                    $c->get(\OC\Authentication\Login\UpdateLastPasswordConfirmCommand::class),
+                    $c->get(\OC\Authentication\Login\FinishRememberedLoginCommand::class),
+                );
+            } catch (\Throwable $e) {
+                // Classes might not exist in this Nextcloud version
+                return null;
+            }
         });
 
         // Register the CookieAuthBackend as a service
@@ -51,10 +57,13 @@ class Application extends App implements IBootstrap
                 $c->get(ISession::class),
             );
 
-            // Inject the login chain
+            // Inject the login chain (if available)
             try {
-                $backend->setLoginChain($c->get(LoginChain::class));
-            } catch (\Exception $e) {
+                $loginChain = $c->get(LoginChain::class);
+                if ($loginChain !== null) {
+                    $backend->setLoginChain($loginChain);
+                }
+            } catch (\Throwable $e) {
                 // LoginChain might not be available in all Nextcloud versions
                 // Fall back to manual login
             }

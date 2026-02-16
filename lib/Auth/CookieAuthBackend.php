@@ -35,7 +35,7 @@ class CookieAuthBackend
     /**
      * Set the login chain (injected from Application)
      */
-    public function setLoginChain(LoginChain $loginChain): void
+    public function setLoginChain(?LoginChain $loginChain): void
     {
         $this->loginChain = $loginChain;
     }
