@@ -16,16 +16,17 @@ Ideal for embedding Nextcloud in portal applications that use Keycloak or simila
 Add the following to your config.php:
 
 ```php
+// For iframe SSO - REQUIRED
+'session_cookie_samesite' => 'None',
+
 'nextcloud-app-cookieauth' => [
+    'realm_url' => 'https://keycloak.example.com/auth/realms/myrealm',
     'cookie_name' => 'authToken',
-    'public_key' => '/path/to/keycloak-public-key.pem',
-    'algorithm' => 'RS256',
-    'user_claim' => 'preferred_username', // or 'email'
-    'issuer' => 'https://my.netzint.de/auth/realms/edulution', // optional: validate issuer
+    'user_claim' => 'preferred_username',
 ],
 ```
     ]]></description>
-    <version>1.0.0</version>
+    <version>1.3.0</version>
     <licence>agpl</licence>
     <author mail="dennis.boelling@netzint.de">Netzint GmbH</author>
     <namespace>CookieAuth</namespace>

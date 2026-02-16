@@ -47,66 +47,45 @@ class Application extends App implements IBootstrap
     {
         $serverContainer = $context->getServerContainer();
 
-        // Get user session to check if already logged in
-        $userSession = $serverContainer->get(IUserSession::class);
-
-        // Skip if already logged in
-        if ($userSession->isLoggedIn()) {
-            return;
-        }
-
         // Skip for CLI requests
         if (php_sapi_name() === 'cli') {
             return;
         }
 
-        $request = $serverContainer->get(IRequest::class);
+        // Get user session to check if already logged in
+        $userSession = $serverContainer->get(IUserSession::class);
 
-        // Skip AJAX requests - they should not trigger auto-login
-        if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest' ||
-            $request->getHeader('OCS-APIREQUEST') === 'true') {
+        // Skip if already logged in with a valid session
+        if ($userSession->isLoggedIn()) {
             return;
         }
 
-        // Skip API and status requests
+        $request = $serverContainer->get(IRequest::class);
         $pathInfo = $request->getPathInfo();
-        $skipPaths = ['/ocs/', '/remote.php/', '/status.php', '/cron.php', '/csrftoken'];
-        foreach ($skipPaths as $skipPath) {
-            if (str_contains($pathInfo, $skipPath)) {
-                return;
-            }
+
+        // Skip logout to allow proper logout
+        if (str_starts_with($pathInfo, '/logout')) {
+            return;
         }
 
-        // Try auto-login early, before Nextcloud redirects to login page
+        // Try auto-login
         $authBackend = $serverContainer->get(CookieAuthBackend::class);
         $loginSuccess = $authBackend->tryAutoLogin($userSession);
 
-        // If login was successful, redirect to refresh the page with new CSRF token
-        if ($loginSuccess) {
-            // Determine redirect URL
-            if (str_starts_with($pathInfo, '/login')) {
-                $redirectUrl = $request->getParam('redirect_url');
-                if ($redirectUrl) {
-                    $redirectUrl = urldecode($redirectUrl);
-                    if (!str_starts_with($redirectUrl, '/')) {
-                        $redirectUrl = '/';
-                    }
-                } else {
+        // If login was successful and we're on the login page, redirect to home
+        if ($loginSuccess && str_starts_with($pathInfo, '/login')) {
+            $redirectUrl = $request->getParam('redirect_url');
+            if ($redirectUrl) {
+                $redirectUrl = urldecode($redirectUrl);
+                if (!str_starts_with($redirectUrl, '/')) {
                     $redirectUrl = '/';
                 }
             } else {
-                // Redirect to current page to refresh CSRF token
-                $redirectUrl = $request->getRequestUri();
+                $redirectUrl = '/';
             }
 
-            // Add a marker to prevent infinite redirect loop
-            if (!$request->getParam('_cookieauth_done')) {
-                $separator = str_contains($redirectUrl, '?') ? '&' : '?';
-                $redirectUrl .= $separator . '_cookieauth_done=1';
-
-                header('Location: ' . $redirectUrl);
-                exit();
-            }
+            header('Location: ' . $redirectUrl);
+            exit();
         }
     }
 }

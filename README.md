@@ -132,6 +132,19 @@ Example cookie:
 Set-Cookie: authToken=eyJhbGci...; Path=/; Domain=.netzint.de; Secure; HttpOnly; SameSite=None
 ```
 
+## Iframe SSO Configuration (CRITICAL)
+
+When embedding Nextcloud in an iframe, you **MUST** configure Nextcloud's session cookie to work cross-origin.
+
+Add to your `config/config.php`:
+
+```php
+// Required for iframe SSO - allows session cookie to be sent in cross-origin iframe
+'session_cookie_samesite' => 'None',
+```
+
+Without this setting, the session cookie won't be sent with iframe requests and the login will appear to work but fail on subsequent requests.
+
 ## User Matching
 
 Users must exist in Nextcloud before auto-login. The app matches by:
@@ -151,7 +164,7 @@ Check logs:
 tail -f /var/www/nextcloud/data/nextcloud.log | grep nextcloud-app-cookieauth
 ```
 
-Status endpoint:
+### Status endpoint
 ```
 GET /apps/nextcloud-app-cookieauth/status
 ```
@@ -168,6 +181,32 @@ Response:
 }
 ```
 
+### Debug endpoint (detailed session info)
+```
+GET /apps/nextcloud-app-cookieauth/debug
+```
+
+Response:
+```json
+{
+  "authenticated": true,
+  "user": { "uid": "dennis.boelling", "displayName": "Dennis Boelling" },
+  "session": {
+    "session_id": "abc123...",
+    "has_loginname": true,
+    "has_user_id": true,
+    "has_requesttoken": true,
+    "has_cookieauth_key": true,
+    "has_dav_auth": true
+  },
+  "cookies_present": ["nc_session_id", "authToken"],
+  "config": {
+    "session_cookie_samesite": "None"
+  },
+  "recommendations": ["Session looks correctly configured."]
+}
+```
+
 ## Troubleshooting
 
 | Problem | Solution |
@@ -178,6 +217,9 @@ Response:
 | "Issuer mismatch" | Check `issuer` config matches JWT |
 | Cookie not sent | Check `SameSite=None; Secure`, verify domain |
 | "Failed to fetch realm info" | Check `realm_url` is accessible from server |
+| Login works but CSRF errors | Add `'session_cookie_samesite' => 'None'` to config.php |
+| Login partial (50%) | Session cookie not persisting - check `session_cookie_samesite` |
+| User shown but operations fail | Use `/debug` endpoint to check session state |
 
 ## Security
 
