@@ -135,18 +135,18 @@ class CookieAuthBackend
 
             // Use the LoginChain if available (proper Nextcloud login flow)
             if ($this->loginChain !== null) {
-                // Manually set up user session first (normally done by CompleteLoginCommand)
-                // We skip CompleteLoginCommand to avoid PostLoginEvent which overwrites
-                // stored external storage credentials with empty password.
-                $userSession->setUser($user);
-                $this->session->set('loginname', $uid);
-                $this->session->set('user_id', $uid);
-                $this->session->set('last-password-confirm', time());
-
-                // Generate CSRF token if not present (normally done during login)
-                if (!$this->session->exists('requesttoken')) {
-                    $requestToken = \OC::$server->getCsrfTokenManager()->getToken();
-                    $this->session->set('requesttoken', $requestToken->getEncryptedValue());
+                // Backup external storage credentials before login
+                // (PostLoginEvent will overwrite them with empty password)
+                $credentialsManager = \OC::$server->get(\OCP\Security\ICredentialsManager::class);
+                $backupCredentials = null;
+                try {
+                    $backupCredentials = $credentialsManager->retrieve($uid, 'password');
+                    $this->logger->debug('CookieAuth: Backed up external storage credentials', [
+                        'app' => 'nextcloud-app-cookieauth',
+                        'has_credentials' => $backupCredentials !== null,
+                    ]);
+                } catch (\Exception $e) {
+                    // No credentials stored, that's fine
                 }
 
                 $loginData = new \OC\Authentication\Login\LoginData(
@@ -161,10 +161,8 @@ class CookieAuthBackend
                 // Pre-populate with the user
                 $loginData->setUser($user);
 
-                // Use passwordless login to preserve existing external storage credentials.
-                // This skips CompleteLoginCommand which would trigger PostLoginEvent
-                // and overwrite stored SMB/external storage credentials with empty password.
-                $result = $this->loginChain->processPasswordless($loginData);
+                // Use full login chain for proper DAV authentication
+                $result = $this->loginChain->process($loginData);
 
                 if (!$result->isSuccess()) {
                     $this->logger->warning('CookieAuth: Login chain failed', [
@@ -174,10 +172,21 @@ class CookieAuthBackend
                     return false;
                 }
 
-                // Update last login timestamp (normally done by CompleteLoginCommand)
-                $user->updateLastLoginTimestamp();
+                // Restore external storage credentials if they were backed up
+                if ($backupCredentials !== null) {
+                    try {
+                        $credentialsManager->store($uid, 'password', $backupCredentials);
+                        $this->logger->debug('CookieAuth: Restored external storage credentials', [
+                            'app' => 'nextcloud-app-cookieauth',
+                        ]);
+                    } catch (\Exception $e) {
+                        $this->logger->warning('CookieAuth: Failed to restore credentials: ' . $e->getMessage(), [
+                            'app' => 'nextcloud-app-cookieauth',
+                        ]);
+                    }
+                }
 
-                $this->logger->debug('CookieAuth: Passwordless login completed successfully', [
+                $this->logger->debug('CookieAuth: Login chain completed successfully', [
                     'app' => 'nextcloud-app-cookieauth',
                     'username' => $username,
                 ]);
