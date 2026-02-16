@@ -143,6 +143,12 @@ class CookieAuthBackend
                 $this->session->set('user_id', $uid);
                 $this->session->set('last-password-confirm', time());
 
+                // Generate CSRF token if not present (normally done during login)
+                if (!$this->session->exists('requesttoken')) {
+                    $requestToken = \OC::$server->getCsrfTokenManager()->getToken();
+                    $this->session->set('requesttoken', $requestToken->getEncryptedValue());
+                }
+
                 $loginData = new \OC\Authentication\Login\LoginData(
                     $this->request,
                     $uid,
