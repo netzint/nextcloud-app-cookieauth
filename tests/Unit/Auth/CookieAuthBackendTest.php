@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\JwtCookieAuth\Tests\Unit\Auth;
+namespace OCA\CookieAuth\Tests\Unit\Auth;
 
-use OCA\JwtCookieAuth\Auth\JwtCookieAuthBackend;
+use OCA\CookieAuth\Auth\CookieAuthBackend;
 use OCP\IConfig;
 use OCP\IRequest;
 use OCP\ISession;
@@ -15,9 +15,9 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
-class JwtCookieAuthBackendTest extends TestCase
+class CookieAuthBackendTest extends TestCase
 {
-    private JwtCookieAuthBackend $backend;
+    private CookieAuthBackend $backend;
     private IUserManager&MockObject $userManager;
     private IConfig&MockObject $config;
     private LoggerInterface&MockObject $logger;
@@ -37,7 +37,7 @@ class JwtCookieAuthBackendTest extends TestCase
         $this->request = $this->createMock(IRequest::class);
         $this->session = $this->createMock(ISession::class);
 
-        $this->backend = new JwtCookieAuthBackend(
+        $this->backend = new CookieAuthBackend(
             $this->userManager,
             $this->config,
             $this->logger,
@@ -107,7 +107,7 @@ class JwtCookieAuthBackendTest extends TestCase
     public function testTryAutoLogin_NoConfig_ReturnsFalse(): void
     {
         $this->config->method('getSystemValue')
-            ->with('jwtcookieauth', null)
+            ->with('cookieauth', null)
             ->willReturn(null);
 
         $userSession = $this->createMock(IUserSession::class);
@@ -120,7 +120,7 @@ class JwtCookieAuthBackendTest extends TestCase
     public function testTryAutoLogin_NoCookie_ReturnsFalse(): void
     {
         $this->config->method('getSystemValue')
-            ->with('jwtcookieauth', null)
+            ->with('cookieauth', null)
             ->willReturn($this->getDefaultConfig());
 
         $this->request->method('getCookie')
@@ -139,7 +139,7 @@ class JwtCookieAuthBackendTest extends TestCase
         $config = $this->getDefaultConfig();
 
         $this->config->method('getSystemValue')
-            ->with('jwtcookieauth', null)
+            ->with('cookieauth', null)
             ->willReturn($config);
 
         $payload = [
@@ -181,7 +181,7 @@ class JwtCookieAuthBackendTest extends TestCase
         $config = $this->getDefaultConfig();
 
         $this->config->method('getSystemValue')
-            ->with('jwtcookieauth', null)
+            ->with('cookieauth', null)
             ->willReturn($config);
 
         $payload = [
@@ -211,7 +211,7 @@ class JwtCookieAuthBackendTest extends TestCase
         $config = $this->getDefaultConfig();
 
         $this->config->method('getSystemValue')
-            ->with('jwtcookieauth', null)
+            ->with('cookieauth', null)
             ->willReturn($config);
 
         $payload = [
@@ -241,7 +241,7 @@ class JwtCookieAuthBackendTest extends TestCase
         $config = $this->getDefaultConfig();
 
         $this->config->method('getSystemValue')
-            ->with('jwtcookieauth', null)
+            ->with('cookieauth', null)
             ->willReturn($config);
 
         $payload = [
@@ -275,7 +275,7 @@ class JwtCookieAuthBackendTest extends TestCase
         $config = $this->getDefaultConfig();
 
         $this->config->method('getSystemValue')
-            ->with('jwtcookieauth', null)
+            ->with('cookieauth', null)
             ->willReturn($config);
 
         $payload = [
@@ -313,7 +313,7 @@ class JwtCookieAuthBackendTest extends TestCase
         $config['algorithm'] = 'RS512'; // Expect RS512
 
         $this->config->method('getSystemValue')
-            ->with('jwtcookieauth', null)
+            ->with('cookieauth', null)
             ->willReturn($config);
 
         $payload = [
@@ -344,7 +344,7 @@ class JwtCookieAuthBackendTest extends TestCase
         $config = $this->getDefaultConfig();
 
         $this->config->method('getSystemValue')
-            ->with('jwtcookieauth', null)
+            ->with('cookieauth', null)
             ->willReturn($config);
 
         // Invalid token (not 3 parts)
@@ -368,7 +368,7 @@ class JwtCookieAuthBackendTest extends TestCase
         $config['user_claim'] = 'user.name'; // Nested claim
 
         $this->config->method('getSystemValue')
-            ->with('jwtcookieauth', null)
+            ->with('cookieauth', null)
             ->willReturn($config);
 
         $payload = [

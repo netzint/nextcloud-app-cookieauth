@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\JwtCookieAuth\Auth;
+namespace OCA\CookieAuth\Auth;
 
 use OCP\IConfig;
 use OCP\IRequest;
@@ -11,13 +11,13 @@ use OCP\IUserManager;
 use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
 
-class JwtCookieAuthBackend
+class CookieAuthBackend
 {
-    private const SESSION_KEY = 'jwtcookieauth_authenticated';
-    private const SESSION_TOKEN_HASH = 'jwtcookieauth_token_hash';
-    private const SESSION_TOKEN_EXP = 'jwtcookieauth_token_exp';
-    private const CACHE_KEY_PUBLIC_KEY = 'jwtcookieauth_cached_public_key';
-    private const CACHE_KEY_PUBLIC_KEY_TIME = 'jwtcookieauth_cached_public_key_time';
+    private const SESSION_KEY = 'cookieauth_authenticated';
+    private const SESSION_TOKEN_HASH = 'cookieauth_token_hash';
+    private const SESSION_TOKEN_EXP = 'cookieauth_token_exp';
+    private const CACHE_KEY_PUBLIC_KEY = 'cookieauth_cached_public_key';
+    private const CACHE_KEY_PUBLIC_KEY_TIME = 'cookieauth_cached_public_key_time';
     private const CACHE_TTL = 3600; // Cache public key for 1 hour
 
     public function __construct(
@@ -44,7 +44,7 @@ class JwtCookieAuthBackend
         $token = $this->getTokenFromCookie($appConfig['cookie_name']);
 
         if (!$token) {
-            $this->logger->debug('JwtCookieAuth: No token found in cookie', ['app' => 'jwtcookieauth']);
+            $this->logger->debug('CookieAuth: No token found in cookie', ['app' => 'cookieauth']);
             return false;
         }
 
@@ -58,7 +58,7 @@ class JwtCookieAuthBackend
             $sessionTokenHash === $tokenHash &&
             $sessionTokenExp !== null &&
             $sessionTokenExp > time()) {
-            $this->logger->debug('JwtCookieAuth: Token already processed in this session', ['app' => 'jwtcookieauth']);
+            $this->logger->debug('CookieAuth: Token already processed in this session', ['app' => 'cookieauth']);
             return true;
         }
 
@@ -75,7 +75,7 @@ class JwtCookieAuthBackend
         $username = $this->extractUsername($payload, $appConfig);
 
         if (!$username) {
-            $this->logger->warning('JwtCookieAuth: Could not extract username from token', ['app' => 'jwtcookieauth']);
+            $this->logger->warning('CookieAuth: Could not extract username from token', ['app' => 'cookieauth']);
             return false;
         }
 
@@ -88,8 +88,8 @@ class JwtCookieAuthBackend
         }
 
         if (!$user) {
-            $this->logger->warning('JwtCookieAuth: User not found in Nextcloud', [
-                'app' => 'jwtcookieauth',
+            $this->logger->warning('CookieAuth: User not found in Nextcloud', [
+                'app' => 'cookieauth',
                 'username' => $username,
             ]);
             return false;
@@ -97,8 +97,8 @@ class JwtCookieAuthBackend
 
         // Check if user is enabled
         if (!$user->isEnabled()) {
-            $this->logger->warning('JwtCookieAuth: User is disabled', [
-                'app' => 'jwtcookieauth',
+            $this->logger->warning('CookieAuth: User is disabled', [
+                'app' => 'cookieauth',
                 'username' => $username,
             ]);
             return false;
@@ -114,8 +114,8 @@ class JwtCookieAuthBackend
             // Store token expiration for session validation
             $this->session->set(self::SESSION_TOKEN_EXP, $payload['exp'] ?? (time() + 3600));
 
-            $this->logger->info('JwtCookieAuth: User logged in successfully', [
-                'app' => 'jwtcookieauth',
+            $this->logger->info('CookieAuth: User logged in successfully', [
+                'app' => 'cookieauth',
                 'username' => $username,
             ]);
             return true;
@@ -141,8 +141,8 @@ class JwtCookieAuthBackend
         }
 
         if (count($users) > 1) {
-            $this->logger->warning('JwtCookieAuth: Multiple users found with same email, cannot auto-login', [
-                'app' => 'jwtcookieauth',
+            $this->logger->warning('CookieAuth: Multiple users found with same email, cannot auto-login', [
+                'app' => 'cookieauth',
                 'email' => $email,
                 'user_count' => count($users),
             ]);
@@ -166,10 +166,10 @@ class JwtCookieAuthBackend
      */
     private function getAppConfig(): ?array
     {
-        $config = $this->config->getSystemValue('jwtcookieauth', null);
+        $config = $this->config->getSystemValue('cookieauth', null);
 
         if (!$config || !is_array($config)) {
-            $this->logger->debug('JwtCookieAuth: No configuration found', ['app' => 'jwtcookieauth']);
+            $this->logger->debug('CookieAuth: No configuration found', ['app' => 'cookieauth']);
             return null;
         }
 
@@ -179,7 +179,7 @@ class JwtCookieAuthBackend
 
         // Must have either realm_url or public_key
         if (!$hasRealmUrl && !$hasPublicKey) {
-            $this->logger->error('JwtCookieAuth: Missing required config: realm_url or public_key', ['app' => 'jwtcookieauth']);
+            $this->logger->error('CookieAuth: Missing required config: realm_url or public_key', ['app' => 'cookieauth']);
             return null;
         }
 
@@ -187,7 +187,7 @@ class JwtCookieAuthBackend
         $required = ['cookie_name', 'user_claim'];
         foreach ($required as $key) {
             if (!isset($config[$key]) || $config[$key] === '') {
-                $this->logger->error("JwtCookieAuth: Missing required config: $key", ['app' => 'jwtcookieauth']);
+                $this->logger->error("CookieAuth: Missing required config: $key", ['app' => 'cookieauth']);
                 return null;
             }
         }
@@ -228,7 +228,7 @@ class JwtCookieAuthBackend
             // Split token into parts
             $parts = explode('.', $token);
             if (count($parts) !== 3) {
-                $this->logger->warning('JwtCookieAuth: Invalid token format', ['app' => 'jwtcookieauth']);
+                $this->logger->warning('CookieAuth: Invalid token format', ['app' => 'cookieauth']);
                 return null;
             }
 
@@ -237,21 +237,21 @@ class JwtCookieAuthBackend
             // Decode header
             $headerJson = $this->base64UrlDecode($headerB64);
             if ($headerJson === null) {
-                $this->logger->warning('JwtCookieAuth: Failed to decode token header', ['app' => 'jwtcookieauth']);
+                $this->logger->warning('CookieAuth: Failed to decode token header', ['app' => 'cookieauth']);
                 return null;
             }
 
             $header = json_decode($headerJson, true);
             if (!$header || !isset($header['alg'])) {
-                $this->logger->warning('JwtCookieAuth: Invalid token header', ['app' => 'jwtcookieauth']);
+                $this->logger->warning('CookieAuth: Invalid token header', ['app' => 'cookieauth']);
                 return null;
             }
 
             // Check algorithm
             $expectedAlg = $config['algorithm'];
             if ($header['alg'] !== $expectedAlg) {
-                $this->logger->warning('JwtCookieAuth: Algorithm mismatch', [
-                    'app' => 'jwtcookieauth',
+                $this->logger->warning('CookieAuth: Algorithm mismatch', [
+                    'app' => 'cookieauth',
                     'expected' => $expectedAlg,
                     'got' => $header['alg'],
                 ]);
@@ -261,33 +261,33 @@ class JwtCookieAuthBackend
             // Decode payload
             $payloadJson = $this->base64UrlDecode($payloadB64);
             if ($payloadJson === null) {
-                $this->logger->warning('JwtCookieAuth: Failed to decode token payload', ['app' => 'jwtcookieauth']);
+                $this->logger->warning('CookieAuth: Failed to decode token payload', ['app' => 'cookieauth']);
                 return null;
             }
 
             $payload = json_decode($payloadJson, true);
             if (!$payload) {
-                $this->logger->warning('JwtCookieAuth: Invalid token payload', ['app' => 'jwtcookieauth']);
+                $this->logger->warning('CookieAuth: Invalid token payload', ['app' => 'cookieauth']);
                 return null;
             }
 
             // Check expiration
             if (isset($payload['exp']) && $payload['exp'] < time()) {
-                $this->logger->warning('JwtCookieAuth: Token expired', ['app' => 'jwtcookieauth']);
+                $this->logger->warning('CookieAuth: Token expired', ['app' => 'cookieauth']);
                 return null;
             }
 
             // Check not before
             if (isset($payload['nbf']) && $payload['nbf'] > time()) {
-                $this->logger->warning('JwtCookieAuth: Token not yet valid', ['app' => 'jwtcookieauth']);
+                $this->logger->warning('CookieAuth: Token not yet valid', ['app' => 'cookieauth']);
                 return null;
             }
 
             // Check issuer if configured
             if (isset($config['issuer']) && $config['issuer'] !== '') {
                 if (!isset($payload['iss']) || $payload['iss'] !== $config['issuer']) {
-                    $this->logger->warning('JwtCookieAuth: Issuer mismatch', [
-                        'app' => 'jwtcookieauth',
+                    $this->logger->warning('CookieAuth: Issuer mismatch', [
+                        'app' => 'cookieauth',
                         'expected' => $config['issuer'],
                         'got' => $payload['iss'] ?? 'not set',
                     ]);
@@ -297,14 +297,14 @@ class JwtCookieAuthBackend
 
             // Verify signature
             if (!$this->verifySignature($headerB64, $payloadB64, $signatureB64, $config)) {
-                $this->logger->warning('JwtCookieAuth: Signature verification failed', ['app' => 'jwtcookieauth']);
+                $this->logger->warning('CookieAuth: Signature verification failed', ['app' => 'cookieauth']);
                 return null;
             }
 
             return $payload;
         } catch (\Exception $e) {
-            $this->logger->error('JwtCookieAuth: Token validation error', [
-                'app' => 'jwtcookieauth',
+            $this->logger->error('CookieAuth: Token validation error', [
+                'app' => 'cookieauth',
                 'error' => $e->getMessage(),
             ]);
             return null;
@@ -329,8 +329,8 @@ class JwtCookieAuthBackend
             if (file_exists($publicKeyPath)) {
                 $publicKey = file_get_contents($publicKeyPath);
                 if ($publicKey === false) {
-                    $this->logger->error('JwtCookieAuth: Could not read public key file', [
-                        'app' => 'jwtcookieauth',
+                    $this->logger->error('CookieAuth: Could not read public key file', [
+                        'app' => 'cookieauth',
                         'path' => $publicKeyPath,
                     ]);
                     return null;
@@ -338,8 +338,8 @@ class JwtCookieAuthBackend
                 return $publicKey;
             }
 
-            $this->logger->error('JwtCookieAuth: Public key file not found', [
-                'app' => 'jwtcookieauth',
+            $this->logger->error('CookieAuth: Public key file not found', [
+                'app' => 'cookieauth',
                 'path' => $publicKeyPath,
             ]);
             return null;
@@ -360,17 +360,17 @@ class JwtCookieAuthBackend
     private function fetchPublicKeyFromRealm(string $realmUrl): ?string
     {
         // Check cache first
-        $cachedKey = $this->config->getAppValue('jwtcookieauth', self::CACHE_KEY_PUBLIC_KEY, '');
-        $cacheTime = (int) $this->config->getAppValue('jwtcookieauth', self::CACHE_KEY_PUBLIC_KEY_TIME, '0');
+        $cachedKey = $this->config->getAppValue('cookieauth', self::CACHE_KEY_PUBLIC_KEY, '');
+        $cacheTime = (int) $this->config->getAppValue('cookieauth', self::CACHE_KEY_PUBLIC_KEY_TIME, '0');
 
         if ($cachedKey !== '' && $cacheTime > 0 && (time() - $cacheTime) < self::CACHE_TTL) {
-            $this->logger->debug('JwtCookieAuth: Using cached public key', ['app' => 'jwtcookieauth']);
+            $this->logger->debug('CookieAuth: Using cached public key', ['app' => 'cookieauth']);
             return $cachedKey;
         }
 
         // Fetch from Keycloak
-        $this->logger->info('JwtCookieAuth: Fetching public key from realm', [
-            'app' => 'jwtcookieauth',
+        $this->logger->info('CookieAuth: Fetching public key from realm', [
+            'app' => 'cookieauth',
             'realm_url' => $realmUrl,
         ]);
 
@@ -392,8 +392,8 @@ class JwtCookieAuthBackend
         $response = @file_get_contents($realmUrl, false, $context);
 
         if ($response === false) {
-            $this->logger->error('JwtCookieAuth: Failed to fetch realm info', [
-                'app' => 'jwtcookieauth',
+            $this->logger->error('CookieAuth: Failed to fetch realm info', [
+                'app' => 'cookieauth',
                 'realm_url' => $realmUrl,
             ]);
             return null;
@@ -402,8 +402,8 @@ class JwtCookieAuthBackend
         $realmInfo = json_decode($response, true);
 
         if (!$realmInfo || !isset($realmInfo['public_key'])) {
-            $this->logger->error('JwtCookieAuth: Invalid realm response or missing public_key', [
-                'app' => 'jwtcookieauth',
+            $this->logger->error('CookieAuth: Invalid realm response or missing public_key', [
+                'app' => 'cookieauth',
                 'realm_url' => $realmUrl,
             ]);
             return null;
@@ -415,10 +415,10 @@ class JwtCookieAuthBackend
             "-----END PUBLIC KEY-----";
 
         // Cache the key
-        $this->config->setAppValue('jwtcookieauth', self::CACHE_KEY_PUBLIC_KEY, $publicKey);
-        $this->config->setAppValue('jwtcookieauth', self::CACHE_KEY_PUBLIC_KEY_TIME, (string) time());
+        $this->config->setAppValue('cookieauth', self::CACHE_KEY_PUBLIC_KEY, $publicKey);
+        $this->config->setAppValue('cookieauth', self::CACHE_KEY_PUBLIC_KEY_TIME, (string) time());
 
-        $this->logger->info('JwtCookieAuth: Successfully fetched and cached public key', ['app' => 'jwtcookieauth']);
+        $this->logger->info('CookieAuth: Successfully fetched and cached public key', ['app' => 'cookieauth']);
 
         return $publicKey;
     }
@@ -432,7 +432,7 @@ class JwtCookieAuthBackend
         $signature = $this->base64UrlDecode($signatureB64);
 
         if ($signature === null) {
-            $this->logger->error('JwtCookieAuth: Failed to decode signature', ['app' => 'jwtcookieauth']);
+            $this->logger->error('CookieAuth: Failed to decode signature', ['app' => 'cookieauth']);
             return false;
         }
 
@@ -440,7 +440,7 @@ class JwtCookieAuthBackend
         $publicKey = $this->getPublicKey($config);
 
         if (!$publicKey) {
-            $this->logger->error('JwtCookieAuth: Could not get public key', ['app' => 'jwtcookieauth']);
+            $this->logger->error('CookieAuth: Could not get public key', ['app' => 'cookieauth']);
             return false;
         }
 
@@ -454,8 +454,8 @@ class JwtCookieAuthBackend
         ];
 
         if (!isset($algMap[$algorithm])) {
-            $this->logger->error('JwtCookieAuth: Unsupported algorithm', [
-                'app' => 'jwtcookieauth',
+            $this->logger->error('CookieAuth: Unsupported algorithm', [
+                'app' => 'cookieauth',
                 'algorithm' => $algorithm,
             ]);
             return false;
@@ -463,15 +463,15 @@ class JwtCookieAuthBackend
 
         $key = openssl_pkey_get_public($publicKey);
         if (!$key) {
-            $this->logger->error('JwtCookieAuth: Invalid public key format', ['app' => 'jwtcookieauth']);
+            $this->logger->error('CookieAuth: Invalid public key format', ['app' => 'cookieauth']);
             return false;
         }
 
         $result = openssl_verify($data, $signature, $key, $algMap[$algorithm]);
 
         if ($result === -1) {
-            $this->logger->error('JwtCookieAuth: OpenSSL verification error', [
-                'app' => 'jwtcookieauth',
+            $this->logger->error('CookieAuth: OpenSSL verification error', [
+                'app' => 'cookieauth',
                 'error' => openssl_error_string(),
             ]);
             return false;

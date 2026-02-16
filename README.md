@@ -1,4 +1,4 @@
-# JWT Cookie Auth for Nextcloud
+# Cookie Auth for Nextcloud
 
 A Nextcloud app that enables automatic Single-Sign-On (SSO) when Nextcloud is embedded in an iframe. It reads a JWT token from a configurable cookie, validates it against a public key (e.g., from Keycloak), and automatically logs in the matching Nextcloud user.
 
@@ -23,13 +23,13 @@ This app is perfect for scenarios where:
 
 ```bash
 cd /var/www/nextcloud/apps
-git clone https://github.com/netzint/nextcloud-jwtcookieauth jwtcookieauth
+git clone https://github.com/netzint/nextcloud-cookieauth cookieauth
 ```
 
 2. Enable the app:
 
 ```bash
-sudo -u www-data php occ app:enable jwtcookieauth
+sudo -u www-data php occ app:enable cookieauth
 ```
 
 ## Configuration
@@ -41,7 +41,7 @@ Add the following to your `config/config.php`:
 The app can automatically fetch the public key from your Keycloak realm:
 
 ```php
-'jwtcookieauth' => [
+'cookieauth' => [
     // Keycloak Realm URL - public key is fetched automatically
     'realm_url' => 'https://my.netzint.de/auth/realms/edulution',
 
@@ -63,7 +63,7 @@ The public key is cached for 1 hour to minimize HTTP requests.
 If you prefer to provide the public key manually:
 
 ```php
-'jwtcookieauth' => [
+'cookieauth' => [
     // Name of the cookie containing the JWT token
     'cookie_name' => 'authToken',
 
@@ -148,12 +148,12 @@ Provision users via:
 
 Check logs:
 ```bash
-tail -f /var/www/nextcloud/data/nextcloud.log | grep jwtcookieauth
+tail -f /var/www/nextcloud/data/nextcloud.log | grep cookieauth
 ```
 
 Status endpoint:
 ```
-GET /apps/jwtcookieauth/status
+GET /apps/cookieauth/status
 ```
 
 Response:

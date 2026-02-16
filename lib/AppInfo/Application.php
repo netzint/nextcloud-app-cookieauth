@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace OCA\JwtCookieAuth\AppInfo;
+namespace OCA\CookieAuth\AppInfo;
 
-use OCA\JwtCookieAuth\Auth\JwtCookieAuthBackend;
-use OCA\JwtCookieAuth\Middleware\JwtCookieAuthMiddleware;
+use OCA\CookieAuth\Auth\CookieAuthBackend;
+use OCA\CookieAuth\Middleware\CookieAuthMiddleware;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -18,7 +18,7 @@ use Psr\Log\LoggerInterface;
 
 class Application extends App implements IBootstrap
 {
-    public const APP_ID = 'jwtcookieauth';
+    public const APP_ID = 'cookieauth';
 
     public function __construct(array $urlParams = [])
     {
@@ -27,9 +27,9 @@ class Application extends App implements IBootstrap
 
     public function register(IRegistrationContext $context): void
     {
-        // Register the JwtCookieAuthBackend as a service
-        $context->registerService(JwtCookieAuthBackend::class, function ($c) {
-            return new JwtCookieAuthBackend(
+        // Register the CookieAuthBackend as a service
+        $context->registerService(CookieAuthBackend::class, function ($c) {
+            return new CookieAuthBackend(
                 $c->get(IUserManager::class),
                 $c->get(IConfig::class),
                 $c->get(LoggerInterface::class),
@@ -39,7 +39,7 @@ class Application extends App implements IBootstrap
         });
 
         // Register the middleware that handles auto-login
-        $context->registerMiddleware(JwtCookieAuthMiddleware::class);
+        $context->registerMiddleware(CookieAuthMiddleware::class);
     }
 
     public function boot(IBootContext $context): void

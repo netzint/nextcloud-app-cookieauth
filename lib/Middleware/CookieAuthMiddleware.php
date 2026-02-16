@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace OCA\JwtCookieAuth\Middleware;
+namespace OCA\CookieAuth\Middleware;
 
-use OCA\JwtCookieAuth\Auth\JwtCookieAuthBackend;
+use OCA\CookieAuth\Auth\CookieAuthBackend;
 use OCP\AppFramework\Middleware;
 use OCP\IRequest;
 use OCP\IUserSession;
 
-class JwtCookieAuthMiddleware extends Middleware
+class CookieAuthMiddleware extends Middleware
 {
     public function __construct(
         private IUserSession $userSession,
         private IRequest $request,
-        private JwtCookieAuthBackend $authBackend,
+        private CookieAuthBackend $authBackend,
     ) {
     }
 

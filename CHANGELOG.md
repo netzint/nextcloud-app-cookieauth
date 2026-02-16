@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the JWT Cookie Auth app will be documented in this file.
+All notable changes to the Cookie Auth app will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Refactored to use proper Dependency Injection via Service Container
-- Middleware now receives `JwtCookieAuthBackend` via constructor injection
+- Middleware now receives `CookieAuthBackend` via constructor injection
 - Removed duplicate authentication attempts (was in both `boot()` and middleware)
 - Improved session validation with token expiration tracking
 
@@ -47,4 +47,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configurable user claim mapping
 - Optional issuer validation
 - Fallback to email lookup
-- Debug endpoint at `/apps/jwtcookieauth/status`
+- Debug endpoint at `/apps/cookieauth/status`

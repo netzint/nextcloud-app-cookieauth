@@ -1,6 +1,6 @@
 {
-    "name": "netzint/jwtcookieauth",
-    "description": "JWT Cookie Authentication for Nextcloud",
+    "name": "netzint/cookieauth",
+    "description": "Cookie Authentication for Nextcloud",
     "type": "nextcloud-app",
     "license": "AGPL-3.0-or-later",
     "authors": [
@@ -18,12 +18,12 @@
     },
     "autoload": {
         "psr-4": {
-            "OCA\\JwtCookieAuth\\": "lib/"
+            "OCA\\CookieAuth\\": "lib/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "OCA\\JwtCookieAuth\\Tests\\": "tests/"
+            "OCA\\CookieAuth\\Tests\\": "tests/"
         }
     },
     "scripts": {

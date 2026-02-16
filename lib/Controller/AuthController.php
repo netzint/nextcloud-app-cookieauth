@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\JwtCookieAuth\Controller;
+namespace OCA\CookieAuth\Controller;
 
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
@@ -23,7 +23,7 @@ class AuthController extends Controller
      * @NoAdminRequired
      * @NoCSRFRequired
      * @PublicPage
-     * 
+     *
      * Check authentication status - useful for debugging
      */
     public function status(): JSONResponse

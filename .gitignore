@@ -1,2 +1,7 @@
-/vendor
+/vendor/
+/node_modules/
+/.phpunit.cache/
+/coverage/
 .DS_Store
+composer.phar
+*.log
