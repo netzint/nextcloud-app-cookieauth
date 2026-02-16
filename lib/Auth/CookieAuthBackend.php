@@ -104,24 +104,62 @@ class CookieAuthBackend
             return false;
         }
 
-        // Login the user
-        $result = $userSession->setUser($user);
+        // Login the user with a proper session token
+        try {
+            // Use completeLogin if available (handles everything properly)
+            if (method_exists($userSession, 'completeLogin')) {
+                $userSession->completeLogin($user, ['loginName' => $user->getUID(), 'password' => '']);
 
-        if ($result !== false) {
+                $this->logger->debug('CookieAuth: completeLogin called', [
+                    'app' => 'nextcloud-app-cookieauth',
+                    'username' => $username,
+                ]);
+            } else {
+                // Fallback: Set user and create session token manually
+                $userSession->setUser($user);
+
+                if (method_exists($userSession, 'createSessionToken')) {
+                    // Generate a random password for the session token
+                    $randomPassword = bin2hex(random_bytes(32));
+
+                    $userSession->createSessionToken(
+                        $this->request,
+                        $user->getUID(),
+                        $user->getUID(),
+                        $randomPassword,
+                        0,  // DO_NOT_REMEMBER
+                        0   // TEMPORARY_TOKEN
+                    );
+
+                    $this->logger->debug('CookieAuth: Session token created', [
+                        'app' => 'nextcloud-app-cookieauth',
+                        'username' => $username,
+                    ]);
+                }
+            }
+
             // Mark session as authenticated via JWT
             $this->session->set(self::SESSION_KEY, true);
             $this->session->set(self::SESSION_TOKEN_HASH, $tokenHash);
             // Store token expiration for session validation
             $this->session->set(self::SESSION_TOKEN_EXP, $payload['exp'] ?? (time() + 3600));
 
+            // Set login timestamp
+            $this->session->set('last-login', time());
+
             $this->logger->info('CookieAuth: User logged in successfully', [
                 'app' => 'nextcloud-app-cookieauth',
                 'username' => $username,
             ]);
             return true;
+        } catch (\Exception $e) {
+            $this->logger->error('CookieAuth: Failed to create session', [
+                'app' => 'nextcloud-app-cookieauth',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return false;
         }
-
-        return false;
     }
 
     /**
