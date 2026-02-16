@@ -1,5 +1,5 @@
 {
-    "name": "netzint/cookieauth",
+    "name": "netzint/nextcloud-app-cookieauth",
     "description": "Cookie Authentication for Nextcloud",
     "type": "nextcloud-app",
     "license": "AGPL-3.0-or-later",

@@ -107,7 +107,7 @@ class CookieAuthBackendTest extends TestCase
     public function testTryAutoLogin_NoConfig_ReturnsFalse(): void
     {
         $this->config->method('getSystemValue')
-            ->with('cookieauth', null)
+            ->with('nextcloud-app-cookieauth', null)
             ->willReturn(null);
 
         $userSession = $this->createMock(IUserSession::class);
@@ -120,7 +120,7 @@ class CookieAuthBackendTest extends TestCase
     public function testTryAutoLogin_NoCookie_ReturnsFalse(): void
     {
         $this->config->method('getSystemValue')
-            ->with('cookieauth', null)
+            ->with('nextcloud-app-cookieauth', null)
             ->willReturn($this->getDefaultConfig());
 
         $this->request->method('getCookie')
@@ -139,7 +139,7 @@ class CookieAuthBackendTest extends TestCase
         $config = $this->getDefaultConfig();
 
         $this->config->method('getSystemValue')
-            ->with('cookieauth', null)
+            ->with('nextcloud-app-cookieauth', null)
             ->willReturn($config);
 
         $payload = [
@@ -181,7 +181,7 @@ class CookieAuthBackendTest extends TestCase
         $config = $this->getDefaultConfig();
 
         $this->config->method('getSystemValue')
-            ->with('cookieauth', null)
+            ->with('nextcloud-app-cookieauth', null)
             ->willReturn($config);
 
         $payload = [
@@ -211,7 +211,7 @@ class CookieAuthBackendTest extends TestCase
         $config = $this->getDefaultConfig();
 
         $this->config->method('getSystemValue')
-            ->with('cookieauth', null)
+            ->with('nextcloud-app-cookieauth', null)
             ->willReturn($config);
 
         $payload = [
@@ -241,7 +241,7 @@ class CookieAuthBackendTest extends TestCase
         $config = $this->getDefaultConfig();
 
         $this->config->method('getSystemValue')
-            ->with('cookieauth', null)
+            ->with('nextcloud-app-cookieauth', null)
             ->willReturn($config);
 
         $payload = [
@@ -275,7 +275,7 @@ class CookieAuthBackendTest extends TestCase
         $config = $this->getDefaultConfig();
 
         $this->config->method('getSystemValue')
-            ->with('cookieauth', null)
+            ->with('nextcloud-app-cookieauth', null)
             ->willReturn($config);
 
         $payload = [
@@ -313,7 +313,7 @@ class CookieAuthBackendTest extends TestCase
         $config['algorithm'] = 'RS512'; // Expect RS512
 
         $this->config->method('getSystemValue')
-            ->with('cookieauth', null)
+            ->with('nextcloud-app-cookieauth', null)
             ->willReturn($config);
 
         $payload = [
@@ -344,7 +344,7 @@ class CookieAuthBackendTest extends TestCase
         $config = $this->getDefaultConfig();
 
         $this->config->method('getSystemValue')
-            ->with('cookieauth', null)
+            ->with('nextcloud-app-cookieauth', null)
             ->willReturn($config);
 
         // Invalid token (not 3 parts)
@@ -368,7 +368,7 @@ class CookieAuthBackendTest extends TestCase
         $config['user_claim'] = 'user.name'; // Nested claim
 
         $this->config->method('getSystemValue')
-            ->with('cookieauth', null)
+            ->with('nextcloud-app-cookieauth', null)
             ->willReturn($config);
 
         $payload = [

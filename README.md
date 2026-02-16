@@ -23,13 +23,13 @@ This app is perfect for scenarios where:
 
 ```bash
 cd /var/www/nextcloud/apps
-git clone https://github.com/netzint/nextcloud-cookieauth cookieauth
+git clone https://github.com/netzint/nextcloud-app-cookieauth nextcloud-app-cookieauth
 ```
 
 2. Enable the app:
 
 ```bash
-sudo -u www-data php occ app:enable cookieauth
+sudo -u www-data php occ app:enable nextcloud-app-cookieauth
 ```
 
 ## Configuration
@@ -41,7 +41,7 @@ Add the following to your `config/config.php`:
 The app can automatically fetch the public key from your Keycloak realm:
 
 ```php
-'cookieauth' => [
+'nextcloud-app-cookieauth' => [
     // Keycloak Realm URL - public key is fetched automatically
     'realm_url' => 'https://my.netzint.de/auth/realms/edulution',
 
@@ -63,7 +63,7 @@ The public key is cached for 1 hour to minimize HTTP requests.
 If you prefer to provide the public key manually:
 
 ```php
-'cookieauth' => [
+'nextcloud-app-cookieauth' => [
     // Name of the cookie containing the JWT token
     'cookie_name' => 'authToken',
 
@@ -148,12 +148,12 @@ Provision users via:
 
 Check logs:
 ```bash
-tail -f /var/www/nextcloud/data/nextcloud.log | grep cookieauth
+tail -f /var/www/nextcloud/data/nextcloud.log | grep nextcloud-app-cookieauth
 ```
 
 Status endpoint:
 ```
-GET /apps/cookieauth/status
+GET /apps/nextcloud-app-cookieauth/status
 ```
 
 Response:

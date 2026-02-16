@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
-    <id>cookieauth</id>
+    <id>nextcloud-app-cookieauth</id>
     <name>Cookie Auth</name>
     <summary>Auto-login users via JWT token from cookie</summary>
     <description><![CDATA[
@@ -16,7 +16,7 @@ Ideal for embedding Nextcloud in portal applications that use Keycloak or simila
 Add the following to your config.php:
 
 ```php
-'cookieauth' => [
+'nextcloud-app-cookieauth' => [
     'cookie_name' => 'authToken',
     'public_key' => '/path/to/keycloak-public-key.pem',
     'algorithm' => 'RS256',
@@ -30,7 +30,7 @@ Add the following to your config.php:
     <author mail="dennis.boelling@netzint.de">Netzint GmbH</author>
     <namespace>CookieAuth</namespace>
     <category>security</category>
-    <bugs>https://github.com/netzint/nextcloud-cookieauth/issues</bugs>
+    <bugs>https://github.com/netzint/nextcloud-app-cookieauth/issues</bugs>
     <dependencies>
         <nextcloud min-version="25" max-version="31"/>
     </dependencies>

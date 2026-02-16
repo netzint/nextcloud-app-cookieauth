@@ -47,4 +47,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configurable user claim mapping
 - Optional issuer validation
 - Fallback to email lookup
-- Debug endpoint at `/apps/cookieauth/status`
+- Debug endpoint at `/apps/nextcloud-app-cookieauth/status`

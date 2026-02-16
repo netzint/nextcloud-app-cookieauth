@@ -13,11 +13,11 @@ use Psr\Log\LoggerInterface;
 
 class CookieAuthBackend
 {
-    private const SESSION_KEY = 'cookieauth_authenticated';
-    private const SESSION_TOKEN_HASH = 'cookieauth_token_hash';
-    private const SESSION_TOKEN_EXP = 'cookieauth_token_exp';
-    private const CACHE_KEY_PUBLIC_KEY = 'cookieauth_cached_public_key';
-    private const CACHE_KEY_PUBLIC_KEY_TIME = 'cookieauth_cached_public_key_time';
+    private const SESSION_KEY = 'nextcloud_app_cookieauth_authenticated';
+    private const SESSION_TOKEN_HASH = 'nextcloud_app_cookieauth_token_hash';
+    private const SESSION_TOKEN_EXP = 'nextcloud_app_cookieauth_token_exp';
+    private const CACHE_KEY_PUBLIC_KEY = 'nextcloud_app_cookieauth_cached_public_key';
+    private const CACHE_KEY_PUBLIC_KEY_TIME = 'nextcloud_app_cookieauth_cached_public_key_time';
     private const CACHE_TTL = 3600; // Cache public key for 1 hour
 
     public function __construct(
@@ -44,7 +44,7 @@ class CookieAuthBackend
         $token = $this->getTokenFromCookie($appConfig['cookie_name']);
 
         if (!$token) {
-            $this->logger->debug('CookieAuth: No token found in cookie', ['app' => 'cookieauth']);
+            $this->logger->debug('CookieAuth: No token found in cookie', ['app' => 'nextcloud-app-cookieauth']);
             return false;
         }
 
@@ -58,7 +58,7 @@ class CookieAuthBackend
             $sessionTokenHash === $tokenHash &&
             $sessionTokenExp !== null &&
             $sessionTokenExp > time()) {
-            $this->logger->debug('CookieAuth: Token already processed in this session', ['app' => 'cookieauth']);
+            $this->logger->debug('CookieAuth: Token already processed in this session', ['app' => 'nextcloud-app-cookieauth']);
             return true;
         }
 
@@ -75,7 +75,7 @@ class CookieAuthBackend
         $username = $this->extractUsername($payload, $appConfig);
 
         if (!$username) {
-            $this->logger->warning('CookieAuth: Could not extract username from token', ['app' => 'cookieauth']);
+            $this->logger->warning('CookieAuth: Could not extract username from token', ['app' => 'nextcloud-app-cookieauth']);
             return false;
         }
 
@@ -89,7 +89,7 @@ class CookieAuthBackend
 
         if (!$user) {
             $this->logger->warning('CookieAuth: User not found in Nextcloud', [
-                'app' => 'cookieauth',
+                'app' => 'nextcloud-app-cookieauth',
                 'username' => $username,
             ]);
             return false;
@@ -98,7 +98,7 @@ class CookieAuthBackend
         // Check if user is enabled
         if (!$user->isEnabled()) {
             $this->logger->warning('CookieAuth: User is disabled', [
-                'app' => 'cookieauth',
+                'app' => 'nextcloud-app-cookieauth',
                 'username' => $username,
             ]);
             return false;
@@ -115,7 +115,7 @@ class CookieAuthBackend
             $this->session->set(self::SESSION_TOKEN_EXP, $payload['exp'] ?? (time() + 3600));
 
             $this->logger->info('CookieAuth: User logged in successfully', [
-                'app' => 'cookieauth',
+                'app' => 'nextcloud-app-cookieauth',
                 'username' => $username,
             ]);
             return true;
@@ -142,7 +142,7 @@ class CookieAuthBackend
 
         if (count($users) > 1) {
             $this->logger->warning('CookieAuth: Multiple users found with same email, cannot auto-login', [
-                'app' => 'cookieauth',
+                'app' => 'nextcloud-app-cookieauth',
                 'email' => $email,
                 'user_count' => count($users),
             ]);
@@ -166,10 +166,10 @@ class CookieAuthBackend
      */
     private function getAppConfig(): ?array
     {
-        $config = $this->config->getSystemValue('cookieauth', null);
+        $config = $this->config->getSystemValue('nextcloud-app-cookieauth', null);
 
         if (!$config || !is_array($config)) {
-            $this->logger->debug('CookieAuth: No configuration found', ['app' => 'cookieauth']);
+            $this->logger->debug('CookieAuth: No configuration found', ['app' => 'nextcloud-app-cookieauth']);
             return null;
         }
 
@@ -179,7 +179,7 @@ class CookieAuthBackend
 
         // Must have either realm_url or public_key
         if (!$hasRealmUrl && !$hasPublicKey) {
-            $this->logger->error('CookieAuth: Missing required config: realm_url or public_key', ['app' => 'cookieauth']);
+            $this->logger->error('CookieAuth: Missing required config: realm_url or public_key', ['app' => 'nextcloud-app-cookieauth']);
             return null;
         }
 
@@ -187,7 +187,7 @@ class CookieAuthBackend
         $required = ['cookie_name', 'user_claim'];
         foreach ($required as $key) {
             if (!isset($config[$key]) || $config[$key] === '') {
-                $this->logger->error("CookieAuth: Missing required config: $key", ['app' => 'cookieauth']);
+                $this->logger->error("CookieAuth: Missing required config: $key", ['app' => 'nextcloud-app-cookieauth']);
                 return null;
             }
         }
@@ -228,7 +228,7 @@ class CookieAuthBackend
             // Split token into parts
             $parts = explode('.', $token);
             if (count($parts) !== 3) {
-                $this->logger->warning('CookieAuth: Invalid token format', ['app' => 'cookieauth']);
+                $this->logger->warning('CookieAuth: Invalid token format', ['app' => 'nextcloud-app-cookieauth']);
                 return null;
             }
 
@@ -237,13 +237,13 @@ class CookieAuthBackend
             // Decode header
             $headerJson = $this->base64UrlDecode($headerB64);
             if ($headerJson === null) {
-                $this->logger->warning('CookieAuth: Failed to decode token header', ['app' => 'cookieauth']);
+                $this->logger->warning('CookieAuth: Failed to decode token header', ['app' => 'nextcloud-app-cookieauth']);
                 return null;
             }
 
             $header = json_decode($headerJson, true);
             if (!$header || !isset($header['alg'])) {
-                $this->logger->warning('CookieAuth: Invalid token header', ['app' => 'cookieauth']);
+                $this->logger->warning('CookieAuth: Invalid token header', ['app' => 'nextcloud-app-cookieauth']);
                 return null;
             }
 
@@ -251,7 +251,7 @@ class CookieAuthBackend
             $expectedAlg = $config['algorithm'];
             if ($header['alg'] !== $expectedAlg) {
                 $this->logger->warning('CookieAuth: Algorithm mismatch', [
-                    'app' => 'cookieauth',
+                    'app' => 'nextcloud-app-cookieauth',
                     'expected' => $expectedAlg,
                     'got' => $header['alg'],
                 ]);
@@ -261,25 +261,25 @@ class CookieAuthBackend
             // Decode payload
             $payloadJson = $this->base64UrlDecode($payloadB64);
             if ($payloadJson === null) {
-                $this->logger->warning('CookieAuth: Failed to decode token payload', ['app' => 'cookieauth']);
+                $this->logger->warning('CookieAuth: Failed to decode token payload', ['app' => 'nextcloud-app-cookieauth']);
                 return null;
             }
 
             $payload = json_decode($payloadJson, true);
             if (!$payload) {
-                $this->logger->warning('CookieAuth: Invalid token payload', ['app' => 'cookieauth']);
+                $this->logger->warning('CookieAuth: Invalid token payload', ['app' => 'nextcloud-app-cookieauth']);
                 return null;
             }
 
             // Check expiration
             if (isset($payload['exp']) && $payload['exp'] < time()) {
-                $this->logger->warning('CookieAuth: Token expired', ['app' => 'cookieauth']);
+                $this->logger->warning('CookieAuth: Token expired', ['app' => 'nextcloud-app-cookieauth']);
                 return null;
             }
 
             // Check not before
             if (isset($payload['nbf']) && $payload['nbf'] > time()) {
-                $this->logger->warning('CookieAuth: Token not yet valid', ['app' => 'cookieauth']);
+                $this->logger->warning('CookieAuth: Token not yet valid', ['app' => 'nextcloud-app-cookieauth']);
                 return null;
             }
 
@@ -287,7 +287,7 @@ class CookieAuthBackend
             if (isset($config['issuer']) && $config['issuer'] !== '') {
                 if (!isset($payload['iss']) || $payload['iss'] !== $config['issuer']) {
                     $this->logger->warning('CookieAuth: Issuer mismatch', [
-                        'app' => 'cookieauth',
+                        'app' => 'nextcloud-app-cookieauth',
                         'expected' => $config['issuer'],
                         'got' => $payload['iss'] ?? 'not set',
                     ]);
@@ -297,14 +297,14 @@ class CookieAuthBackend
 
             // Verify signature
             if (!$this->verifySignature($headerB64, $payloadB64, $signatureB64, $config)) {
-                $this->logger->warning('CookieAuth: Signature verification failed', ['app' => 'cookieauth']);
+                $this->logger->warning('CookieAuth: Signature verification failed', ['app' => 'nextcloud-app-cookieauth']);
                 return null;
             }
 
             return $payload;
         } catch (\Exception $e) {
             $this->logger->error('CookieAuth: Token validation error', [
-                'app' => 'cookieauth',
+                'app' => 'nextcloud-app-cookieauth',
                 'error' => $e->getMessage(),
             ]);
             return null;
@@ -330,7 +330,7 @@ class CookieAuthBackend
                 $publicKey = file_get_contents($publicKeyPath);
                 if ($publicKey === false) {
                     $this->logger->error('CookieAuth: Could not read public key file', [
-                        'app' => 'cookieauth',
+                        'app' => 'nextcloud-app-cookieauth',
                         'path' => $publicKeyPath,
                     ]);
                     return null;
@@ -339,7 +339,7 @@ class CookieAuthBackend
             }
 
             $this->logger->error('CookieAuth: Public key file not found', [
-                'app' => 'cookieauth',
+                'app' => 'nextcloud-app-cookieauth',
                 'path' => $publicKeyPath,
             ]);
             return null;
@@ -360,17 +360,17 @@ class CookieAuthBackend
     private function fetchPublicKeyFromRealm(string $realmUrl): ?string
     {
         // Check cache first
-        $cachedKey = $this->config->getAppValue('cookieauth', self::CACHE_KEY_PUBLIC_KEY, '');
-        $cacheTime = (int) $this->config->getAppValue('cookieauth', self::CACHE_KEY_PUBLIC_KEY_TIME, '0');
+        $cachedKey = $this->config->getAppValue('nextcloud-app-cookieauth', self::CACHE_KEY_PUBLIC_KEY, '');
+        $cacheTime = (int) $this->config->getAppValue('nextcloud-app-cookieauth', self::CACHE_KEY_PUBLIC_KEY_TIME, '0');
 
         if ($cachedKey !== '' && $cacheTime > 0 && (time() - $cacheTime) < self::CACHE_TTL) {
-            $this->logger->debug('CookieAuth: Using cached public key', ['app' => 'cookieauth']);
+            $this->logger->debug('CookieAuth: Using cached public key', ['app' => 'nextcloud-app-cookieauth']);
             return $cachedKey;
         }
 
         // Fetch from Keycloak
         $this->logger->info('CookieAuth: Fetching public key from realm', [
-            'app' => 'cookieauth',
+            'app' => 'nextcloud-app-cookieauth',
             'realm_url' => $realmUrl,
         ]);
 
@@ -393,7 +393,7 @@ class CookieAuthBackend
 
         if ($response === false) {
             $this->logger->error('CookieAuth: Failed to fetch realm info', [
-                'app' => 'cookieauth',
+                'app' => 'nextcloud-app-cookieauth',
                 'realm_url' => $realmUrl,
             ]);
             return null;
@@ -403,7 +403,7 @@ class CookieAuthBackend
 
         if (!$realmInfo || !isset($realmInfo['public_key'])) {
             $this->logger->error('CookieAuth: Invalid realm response or missing public_key', [
-                'app' => 'cookieauth',
+                'app' => 'nextcloud-app-cookieauth',
                 'realm_url' => $realmUrl,
             ]);
             return null;
@@ -415,10 +415,10 @@ class CookieAuthBackend
             "-----END PUBLIC KEY-----";
 
         // Cache the key
-        $this->config->setAppValue('cookieauth', self::CACHE_KEY_PUBLIC_KEY, $publicKey);
-        $this->config->setAppValue('cookieauth', self::CACHE_KEY_PUBLIC_KEY_TIME, (string) time());
+        $this->config->setAppValue('nextcloud-app-cookieauth', self::CACHE_KEY_PUBLIC_KEY, $publicKey);
+        $this->config->setAppValue('nextcloud-app-cookieauth', self::CACHE_KEY_PUBLIC_KEY_TIME, (string) time());
 
-        $this->logger->info('CookieAuth: Successfully fetched and cached public key', ['app' => 'cookieauth']);
+        $this->logger->info('CookieAuth: Successfully fetched and cached public key', ['app' => 'nextcloud-app-cookieauth']);
 
         return $publicKey;
     }
@@ -432,7 +432,7 @@ class CookieAuthBackend
         $signature = $this->base64UrlDecode($signatureB64);
 
         if ($signature === null) {
-            $this->logger->error('CookieAuth: Failed to decode signature', ['app' => 'cookieauth']);
+            $this->logger->error('CookieAuth: Failed to decode signature', ['app' => 'nextcloud-app-cookieauth']);
             return false;
         }
 
@@ -440,7 +440,7 @@ class CookieAuthBackend
         $publicKey = $this->getPublicKey($config);
 
         if (!$publicKey) {
-            $this->logger->error('CookieAuth: Could not get public key', ['app' => 'cookieauth']);
+            $this->logger->error('CookieAuth: Could not get public key', ['app' => 'nextcloud-app-cookieauth']);
             return false;
         }
 
@@ -455,7 +455,7 @@ class CookieAuthBackend
 
         if (!isset($algMap[$algorithm])) {
             $this->logger->error('CookieAuth: Unsupported algorithm', [
-                'app' => 'cookieauth',
+                'app' => 'nextcloud-app-cookieauth',
                 'algorithm' => $algorithm,
             ]);
             return false;
@@ -463,7 +463,7 @@ class CookieAuthBackend
 
         $key = openssl_pkey_get_public($publicKey);
         if (!$key) {
-            $this->logger->error('CookieAuth: Invalid public key format', ['app' => 'cookieauth']);
+            $this->logger->error('CookieAuth: Invalid public key format', ['app' => 'nextcloud-app-cookieauth']);
             return false;
         }
 
@@ -471,7 +471,7 @@ class CookieAuthBackend
 
         if ($result === -1) {
             $this->logger->error('CookieAuth: OpenSSL verification error', [
-                'app' => 'cookieauth',
+                'app' => 'nextcloud-app-cookieauth',
                 'error' => openssl_error_string(),
             ]);
             return false;

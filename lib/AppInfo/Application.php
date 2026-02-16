@@ -18,7 +18,7 @@ use Psr\Log\LoggerInterface;
 
 class Application extends App implements IBootstrap
 {
-    public const APP_ID = 'cookieauth';
+    public const APP_ID = 'nextcloud-app-cookieauth';
 
     public function __construct(array $urlParams = [])
     {
