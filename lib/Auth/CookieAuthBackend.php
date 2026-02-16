@@ -147,14 +147,37 @@ class CookieAuthBackend
                     }
                 }
 
-                $loginData = new \OC\Authentication\Login\LoginData(
-                    $this->request,
-                    $uid,
-                    $password, // Real password if available, empty otherwise
-                    false, // rememberLogin
-                    '', // Timezone
-                    '', // Timezone offset
-                );
+                // LoginData constructor signature differs between NC versions:
+                // NC 32.0.1: (request, username, password, redirectUrl, timezone, timezoneOffset)
+                // NC 32.0.6+: (request, username, password, rememberLogin, timezone, timezoneOffset)
+                // Detect which version by checking if 4th parameter is bool or string
+                $reflection = new \ReflectionClass(\OC\Authentication\Login\LoginData::class);
+                $constructor = $reflection->getConstructor();
+                $params = $constructor->getParameters();
+                $fourthParamType = $params[3]->getType();
+                $fourthParamName = $params[3]->getName();
+
+                if ($fourthParamName === 'rememberLogin' || ($fourthParamType && $fourthParamType->getName() === 'bool')) {
+                    // NC 32.0.6+ style
+                    $loginData = new \OC\Authentication\Login\LoginData(
+                        $this->request,
+                        $uid,
+                        $password,
+                        false, // rememberLogin
+                        '', // Timezone
+                        '' // Timezone offset
+                    );
+                } else {
+                    // NC 32.0.1 / older style
+                    $loginData = new \OC\Authentication\Login\LoginData(
+                        $this->request,
+                        $uid,
+                        $password,
+                        '/', // redirectUrl
+                        '', // Timezone
+                        '' // Timezone offset
+                    );
+                }
 
                 // Pre-populate with the user
                 $loginData->setUser($user);
