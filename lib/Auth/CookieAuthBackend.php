@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\CookieAuth\Auth;
 
+use OCA\CookieAuth\Helper\LoginChain;
 use OCP\IConfig;
 use OCP\IRequest;
 use OCP\ISession;
@@ -20,6 +21,8 @@ class CookieAuthBackend
     private const CACHE_KEY_PUBLIC_KEY_TIME = 'nextcloud_app_cookieauth_cached_public_key_time';
     private const CACHE_TTL = 3600; // Cache public key for 1 hour
 
+    private ?LoginChain $loginChain = null;
+
     public function __construct(
         private IUserManager $userManager,
         private IConfig $config,
@@ -27,6 +30,14 @@ class CookieAuthBackend
         private IRequest $request,
         private ISession $session,
     ) {
+    }
+
+    /**
+     * Set the login chain (injected from Application)
+     */
+    public function setLoginChain(LoginChain $loginChain): void
+    {
+        $this->loginChain = $loginChain;
     }
 
     /**
@@ -104,91 +115,89 @@ class CookieAuthBackend
             return false;
         }
 
-        // Login the user using Nextcloud's internal login mechanism
+        // Login the user using Nextcloud's internal login chain
         try {
             $uid = $user->getUID();
 
-            // Set the user on the session
-            $userSession->setUser($user);
+            // If there's an existing different user session, log out first
+            // This prevents session conflicts
+            if ($userSession instanceof \OC\User\Session) {
+                $currentUser = $userSession->getUser();
+                if ($currentUser !== null && $currentUser->getUID() !== $uid) {
+                    $this->logger->debug('CookieAuth: Logging out existing user before new login', [
+                        'app' => 'nextcloud-app-cookieauth',
+                        'old_user' => $currentUser->getUID(),
+                        'new_user' => $uid,
+                    ]);
+                    $userSession->logout();
+                }
+            }
 
-            // Set all essential session variables that Nextcloud expects
-            $this->session->set('loginname', $uid);
-            $this->session->set('user_id', $uid);
-            $this->session->set('last-login', time());
+            // Use the LoginChain if available (proper Nextcloud login flow)
+            if ($this->loginChain !== null) {
+                $loginData = new \OC\Authentication\Login\LoginData(
+                    $this->request,
+                    $uid,
+                    '', // Password - not validated by the chain
+                    '/', // Redirect URL
+                    '', // Timezone
+                    '', // Timezone offset
+                );
 
-            // Mark as authenticated to DAV backend (important for WebDAV/CalDAV)
-            $this->session->set('AUTHENTICATED_TO_DAV_BACKEND', true);
+                // Pre-populate with the user (normally done by UserCommand)
+                $loginData->setUser($user);
+
+                // Process through the login chain
+                $result = $this->loginChain->process($loginData);
+
+                if (!$result->isSuccess()) {
+                    $this->logger->warning('CookieAuth: Login chain failed', [
+                        'app' => 'nextcloud-app-cookieauth',
+                        'username' => $username,
+                    ]);
+                    return false;
+                }
+
+                $this->logger->debug('CookieAuth: Login chain completed successfully', [
+                    'app' => 'nextcloud-app-cookieauth',
+                    'username' => $username,
+                ]);
+            } else {
+                // Fallback: Manual login (less reliable for DAV)
+                $this->logger->debug('CookieAuth: Using fallback manual login', [
+                    'app' => 'nextcloud-app-cookieauth',
+                ]);
+
+                $userSession->setUser($user);
+                $this->session->set('loginname', $uid);
+                $this->session->set('user_id', $uid);
+                $this->session->set('last-login', time());
+
+                // Try to create session token manually
+                if ($userSession instanceof \OC\User\Session) {
+                    try {
+                        $userSession->createSessionToken(
+                            $this->request,
+                            $uid,
+                            $uid,
+                            '',
+                            \OC\Authentication\Token\IToken::DO_NOT_REMEMBER,
+                            \OC\Authentication\Token\IToken::TEMPORARY_TOKEN
+                        );
+                    } catch (\Exception $e) {
+                        $this->logger->debug('CookieAuth: Session token creation failed: ' . $e->getMessage(), [
+                            'app' => 'nextcloud-app-cookieauth',
+                        ]);
+                    }
+                }
+
+                $user->updateLastLoginTimestamp();
+            }
 
             // Mark session as authenticated via JWT cookie
             $this->session->set(self::SESSION_KEY, true);
             $this->session->set(self::SESSION_TOKEN_HASH, $tokenHash);
             $this->session->set(self::SESSION_TOKEN_EXP, $payload['exp'] ?? (time() + 3600));
-
-            // Generate and set CSRF token if not present
-            if (!$this->session->exists('requesttoken')) {
-                $requestToken = \OC::$server->getSecureRandom()->generate(32);
-                $this->session->set('requesttoken', $requestToken);
-                $this->logger->debug('CookieAuth: Generated new CSRF token', [
-                    'app' => 'nextcloud-app-cookieauth',
-                ]);
-            }
-
-            // Try to create session token for complete authentication
-            if ($userSession instanceof \OC\User\Session) {
-                try {
-                    // Generate a deterministic password based on JWT token
-                    $deterministicPassword = hash('sha256', $tokenHash . $uid . 'cookieauth-secret-v2');
-
-                    $userSession->createSessionToken(
-                        $this->request,
-                        $uid,
-                        $uid,
-                        $deterministicPassword,
-                        \OC\Authentication\Token\IToken::DO_NOT_REMEMBER,
-                        \OC\Authentication\Token\IToken::TEMPORARY_TOKEN
-                    );
-
-                    $this->logger->debug('CookieAuth: Session token created successfully', [
-                        'app' => 'nextcloud-app-cookieauth',
-                        'username' => $username,
-                    ]);
-                } catch (\Exception $e) {
-                    // Token creation failed - this is OK for basic auth but some features may not work
-                    $this->logger->debug('CookieAuth: Session token creation skipped: ' . $e->getMessage(), [
-                        'app' => 'nextcloud-app-cookieauth',
-                    ]);
-                }
-            }
-
-            // Trigger post-login hooks (some apps depend on these)
-            \OC_Hook::emit('OC_User', 'post_login', [
-                'run' => true,
-                'uid' => $uid,
-                'loginName' => $uid,
-                'password' => null,
-                'isTokenLogin' => true,
-            ]);
-
-            // Dispatch the UserLoggedInEvent for modern Nextcloud apps
-            try {
-                $dispatcher = \OC::$server->get(\OCP\EventDispatcher\IEventDispatcher::class);
-                $dispatcher->dispatchTyped(new \OCP\User\Events\UserLoggedInEvent($user, $uid, null, true));
-            } catch (\Exception $e) {
-                // Ignore if event dispatcher is not available
-                $this->logger->debug('CookieAuth: Could not dispatch login event: ' . $e->getMessage(), [
-                    'app' => 'nextcloud-app-cookieauth',
-                ]);
-            }
-
-            // Update last login timestamp
-            $user->updateLastLoginTimestamp();
-
-            // Force session to save immediately
-            $this->session->close();
-            // Reopen session for subsequent operations
-            if (method_exists($this->session, 'reopen')) {
-                $this->session->reopen();
-            }
 
             $this->logger->info('CookieAuth: User logged in successfully', [
                 'app' => 'nextcloud-app-cookieauth',

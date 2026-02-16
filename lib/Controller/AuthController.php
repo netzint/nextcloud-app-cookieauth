@@ -111,4 +111,42 @@ class AuthController extends Controller
 
         return $recommendations;
     }
+
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     * @PublicPage
+     *
+     * Check if auth token exists in database for current session
+     */
+    public function tokenCheck(): JSONResponse
+    {
+        $sessionId = $this->session->getId();
+        $user = $this->userSession->getUser();
+
+        $tokenInfo = [
+            'session_id' => substr($sessionId, 0, 16) . '...',
+            'has_token' => false,
+            'token_user' => null,
+            'token_name' => null,
+        ];
+
+        try {
+            $tokenProvider = \OC::$server->get(\OC\Authentication\Token\IProvider::class);
+            $token = $tokenProvider->getToken($sessionId);
+
+            $tokenInfo['has_token'] = true;
+            $tokenInfo['token_user'] = $token->getUID();
+            $tokenInfo['token_name'] = $token->getName();
+            $tokenInfo['token_type'] = $token->getType();
+        } catch (\Exception $e) {
+            $tokenInfo['error'] = $e->getMessage();
+        }
+
+        return new JSONResponse([
+            'is_logged_in' => $this->userSession->isLoggedIn(),
+            'current_user' => $user ? $user->getUID() : null,
+            'token' => $tokenInfo,
+        ]);
+    }
 }

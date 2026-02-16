@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\CookieAuth\AppInfo;
 
 use OCA\CookieAuth\Auth\CookieAuthBackend;
+use OCA\CookieAuth\Helper\LoginChain;
 use OCA\CookieAuth\Middleware\CookieAuthMiddleware;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
@@ -28,15 +29,37 @@ class Application extends App implements IBootstrap
 
     public function register(IRegistrationContext $context): void
     {
+        // Register the LoginChain (uses Nextcloud's internal login commands)
+        $context->registerService(LoginChain::class, function ($c) {
+            return new LoginChain(
+                $c->get(\OC\Authentication\Login\PreLoginHookCommand::class),
+                $c->get(\OC\Authentication\Login\CompleteLoginCommand::class),
+                $c->get(\OC\Authentication\Login\CreateSessionTokenCommand::class),
+                $c->get(\OC\Authentication\Login\ClearLostPasswordTokensCommand::class),
+                $c->get(\OC\Authentication\Login\UpdateLastPasswordConfirmCommand::class),
+                $c->get(\OC\Authentication\Login\FinishRememberedLoginCommand::class),
+            );
+        });
+
         // Register the CookieAuthBackend as a service
         $context->registerService(CookieAuthBackend::class, function ($c) {
-            return new CookieAuthBackend(
+            $backend = new CookieAuthBackend(
                 $c->get(IUserManager::class),
                 $c->get(IConfig::class),
                 $c->get(LoggerInterface::class),
                 $c->get(IRequest::class),
                 $c->get(ISession::class),
             );
+
+            // Inject the login chain
+            try {
+                $backend->setLoginChain($c->get(LoginChain::class));
+            } catch (\Exception $e) {
+                // LoginChain might not be available in all Nextcloud versions
+                // Fall back to manual login
+            }
+
+            return $backend;
         });
 
         // Register the middleware that handles auto-login for app routes
