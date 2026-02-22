@@ -66,7 +66,8 @@ class AuthController extends Controller
         ];
 
         // Cookie info (names only, not values for security)
-        $cookieNames = array_keys($_COOKIE ?? []);
+        // Note: We list common cookie names that may be relevant for debugging
+        $cookieNames = $this->getRelevantCookieNames();
 
         // Check SameSite configuration
         $sameSiteConfig = \OC::$server->getConfig()->getSystemValue('session_cookie_samesite', 'Lax');
@@ -84,6 +85,41 @@ class AuthController extends Controller
             ],
             'recommendations' => $this->getRecommendations($isLoggedIn, $sessionInfo, $sameSiteConfig),
         ]);
+    }
+
+    /**
+     * Get relevant cookie names for debugging (without exposing all cookies)
+     *
+     * @return array<string> List of relevant cookie names that are present
+     */
+    private function getRelevantCookieNames(): array
+    {
+        $relevantCookies = [
+            'nc_session_id',
+            'nc_token',
+            'nc_username',
+            'oc_sessionPassphrase',
+            '__Host-nc_sameSiteCookielax',
+            '__Host-nc_sameSiteCookiestrict',
+        ];
+
+        // Get the configured auth cookie name
+        $authCookieName = \OC::$server->getConfig()->getSystemValue(
+            'nextcloud-app-cookieauth',
+            []
+        )['cookie_name'] ?? 'authToken';
+
+        $relevantCookies[] = $authCookieName;
+
+        // Check which relevant cookies are present
+        $presentCookies = [];
+        foreach ($relevantCookies as $cookieName) {
+            if ($this->request->getCookie($cookieName) !== null) {
+                $presentCookies[] = $cookieName;
+            }
+        }
+
+        return $presentCookies;
     }
 
     /**

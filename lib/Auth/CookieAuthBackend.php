@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\CookieAuth\Auth;
 
 use OCA\CookieAuth\Helper\LoginChain;
+use OCA\CookieAuth\Service\ConfigService;
 use OCP\IConfig;
 use OCP\IRequest;
 use OCP\ISession;
@@ -22,6 +23,7 @@ class CookieAuthBackend
     private const CACHE_TTL = 3600; // Cache public key for 1 hour
 
     private ?LoginChain $loginChain = null;
+    private ?ConfigService $configService = null;
 
     public function __construct(
         private IUserManager $userManager,
@@ -30,6 +32,14 @@ class CookieAuthBackend
         private IRequest $request,
         private ISession $session,
     ) {
+    }
+
+    /**
+     * Set the config service (injected from Application)
+     */
+    public function setConfigService(ConfigService $configService): void
+    {
+        $this->configService = $configService;
     }
 
     /**
@@ -288,10 +298,52 @@ class CookieAuthBackend
     }
 
     /**
-     * Get app configuration from config.php
+     * Get app configuration from ConfigService (with config.php fallback)
      */
     private function getAppConfig(): ?array
     {
+        // Use ConfigService if available (preferred method)
+        if ($this->configService !== null) {
+            $config = $this->configService->getAll();
+
+            // Check if realm_url is provided (auto-fetch mode)
+            $hasRealmUrl = !empty($config['realm_url']);
+            $hasPublicKey = !empty($config['public_key']);
+
+            // Must have either realm_url or public_key
+            if (!$hasRealmUrl && !$hasPublicKey) {
+                $this->logger->debug('CookieAuth: No configuration found (neither realm_url nor public_key)',
+                    ['app' => 'nextcloud-app-cookieauth']);
+                return null;
+            }
+
+            // Validate other required config
+            if (empty($config['cookie_name'])) {
+                $this->logger->error('CookieAuth: Missing required config: cookie_name',
+                    ['app' => 'nextcloud-app-cookieauth']);
+                return null;
+            }
+
+            if (empty($config['user_claim'])) {
+                $this->logger->error('CookieAuth: Missing required config: user_claim',
+                    ['app' => 'nextcloud-app-cookieauth']);
+                return null;
+            }
+
+            // Set default algorithm if not provided
+            if (empty($config['algorithm'])) {
+                $config['algorithm'] = 'RS256';
+            }
+
+            // If realm_url is provided, derive issuer from it if not set
+            if ($hasRealmUrl && empty($config['issuer'])) {
+                $config['issuer'] = $config['realm_url'];
+            }
+
+            return $config;
+        }
+
+        // Legacy fallback: read directly from config.php
         $config = $this->config->getSystemValue('nextcloud-app-cookieauth', null);
 
         if (!$config || !is_array($config)) {

@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 return [
     'routes' => [
-        // Optional: Endpoint to check auth status
+        // Auth status endpoints
         ['name' => 'auth#status', 'url' => '/status', 'verb' => 'GET'],
-        // Debug endpoint with more details
         ['name' => 'auth#debug', 'url' => '/debug', 'verb' => 'GET'],
-        // Token check endpoint (shows if auth token exists in database)
         ['name' => 'auth#tokenCheck', 'url' => '/token-check', 'verb' => 'GET'],
+
+        // Admin settings API endpoints
+        ['name' => 'settings#save', 'url' => '/settings/save', 'verb' => 'POST'],
+        ['name' => 'settings#testConnection', 'url' => '/settings/test', 'verb' => 'POST'],
+        ['name' => 'settings#status', 'url' => '/settings/status', 'verb' => 'GET'],
+        ['name' => 'settings#migrate', 'url' => '/settings/migrate', 'verb' => 'POST'],
     ],
 ];

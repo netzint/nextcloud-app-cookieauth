@@ -7,6 +7,7 @@ namespace OCA\CookieAuth\AppInfo;
 use OCA\CookieAuth\Auth\CookieAuthBackend;
 use OCA\CookieAuth\Helper\LoginChain;
 use OCA\CookieAuth\Middleware\CookieAuthMiddleware;
+use OCA\CookieAuth\Service\ConfigService;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -29,6 +30,13 @@ class Application extends App implements IBootstrap
 
     public function register(IRegistrationContext $context): void
     {
+        // Register ConfigService for settings management
+        $context->registerService(ConfigService::class, function ($c) {
+            return new ConfigService(
+                $c->get(IConfig::class),
+            );
+        });
+
         // Register the LoginChain (uses Nextcloud's internal login commands)
         // Wrapped in try-catch because internal classes may not exist in all NC versions
         $context->registerService(LoginChain::class, function ($c) {
@@ -56,6 +64,9 @@ class Application extends App implements IBootstrap
                 $c->get(IRequest::class),
                 $c->get(ISession::class),
             );
+
+            // Inject the ConfigService
+            $backend->setConfigService($c->get(ConfigService::class));
 
             // Inject the login chain (if available)
             try {
@@ -112,17 +123,39 @@ class Application extends App implements IBootstrap
         // If login was successful and we're on the login page, redirect to home
         if ($loginSuccess && (str_starts_with($pathInfo, '/login') || $pathInfo === '')) {
             $redirectUrl = $request->getParam('redirect_url');
-            if ($redirectUrl) {
-                $redirectUrl = urldecode($redirectUrl);
-                if (!str_starts_with($redirectUrl, '/')) {
-                    $redirectUrl = '/';
-                }
-            } else {
-                $redirectUrl = '/';
-            }
+            $redirectUrl = $this->sanitizeRedirectUrl($redirectUrl);
 
             header('Location: ' . $redirectUrl);
             exit();
         }
+    }
+
+    /**
+     * Sanitize redirect URL to prevent open redirect vulnerabilities
+     *
+     * Only allows relative paths starting with a single slash.
+     * Rejects protocol-relative URLs (//), absolute URLs, and other schemes.
+     */
+    private function sanitizeRedirectUrl(?string $url): string
+    {
+        if ($url === null || $url === '') {
+            return '/';
+        }
+
+        $url = urldecode($url);
+
+        // Must start with exactly one slash (not // which is protocol-relative)
+        if (!str_starts_with($url, '/') || str_starts_with($url, '//')) {
+            return '/';
+        }
+
+        // Block any URL containing : before the first / (catches javascript:, data:, etc.)
+        $colonPos = strpos($url, ':');
+        $slashPos = strpos($url, '/', 1);
+        if ($colonPos !== false && ($slashPos === false || $colonPos < $slashPos)) {
+            return '/';
+        }
+
+        return $url;
     }
 }

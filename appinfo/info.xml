@@ -13,28 +13,33 @@ Ideal for embedding Nextcloud in portal applications that use Keycloak or simila
 
 ## Configuration
 
-Add the following to your config.php:
+Configure via **Admin Settings > Security > Cookie Auth**, or add to config.php:
 
 ```php
 // For iframe SSO - REQUIRED
 'session_cookie_samesite' => 'None',
 
 'nextcloud-app-cookieauth' => [
-    'realm_url' => 'https://keycloak.example.com/auth/realms/myrealm',
+    'realm_url' => 'https://your-edulution-domain.com/auth/realms/edulution',
     'cookie_name' => 'authToken',
     'user_claim' => 'preferred_username',
-    // Optional: API to fetch user's password for SMB/external storage
-    'password_api_url' => 'https://my.example.com/api',
 ],
 ```
     ]]></description>
-    <version>1.4.0</version>
+    <version>1.5.0</version>
     <licence>agpl</licence>
     <author mail="dennis.boelling@netzint.de">Netzint GmbH</author>
     <namespace>CookieAuth</namespace>
     <category>security</category>
     <bugs>https://github.com/netzint/nextcloud-app-cookieauth/issues</bugs>
+    <website>https://github.com/netzint/nextcloud-app-cookieauth</website>
+    <repository type="git">https://github.com/netzint/nextcloud-app-cookieauth.git</repository>
     <dependencies>
-        <nextcloud min-version="20" max-version="99"/>
+        <nextcloud min-version="25" max-version="32"/>
     </dependencies>
+
+    <!-- Admin Settings Registration -->
+    <settings>
+        <admin>OCA\CookieAuth\Settings\Admin</admin>
+    </settings>
 </info>
