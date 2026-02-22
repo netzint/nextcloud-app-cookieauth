@@ -36,168 +36,190 @@ style('nextcloud-app-cookieauth', 'admin');
     <div id="cookieauth-status" class="cookieauth-status"></div>
 
     <form id="cookieauth-settings-form">
-        <!-- Keycloak Realm URL -->
-        <div class="form-group">
-            <label for="cookieauth-realm-url">
-                <?php p($l->t('Keycloak Realm URL')); ?>
-                <?php if ($_['configSources']['realm_url'] === 'system'): ?>
-                <span class="cookieauth-source">(<?php p($l->t('from config.php')); ?>)</span>
-                <?php endif; ?>
-            </label>
-            <input type="url"
-                   id="cookieauth-realm-url"
-                   name="realm_url"
-                   value="<?php p($_['config']['realm_url']); ?>"
-                   placeholder="https://your-edulution-domain.com/auth/realms/edulution"
-                   class="cookieauth-input">
-            <p class="settings-hint">
-                <?php p($l->t('Public key will be fetched automatically from this URL. Either this OR Public Key is required.')); ?>
-            </p>
-            <button type="button" id="cookieauth-test-connection" class="button">
-                <span class="icon icon-external"></span>
-                <?php p($l->t('Test Connection')); ?>
-            </button>
-            <span id="cookieauth-test-result"></span>
+        <!-- Section: Keycloak Connection -->
+        <div class="cookieauth-section">
+            <h3><?php p($l->t('Keycloak Connection')); ?></h3>
+
+            <div class="form-group">
+                <label for="cookieauth-realm-url">
+                    <?php p($l->t('Realm URL')); ?>
+                    <?php if ($_['configSources']['realm_url'] === 'system'): ?>
+                    <span class="cookieauth-source">(<?php p($l->t('from config.php')); ?>)</span>
+                    <?php endif; ?>
+                </label>
+                <div class="cookieauth-input-row">
+                    <input type="url"
+                           id="cookieauth-realm-url"
+                           name="realm_url"
+                           value="<?php p($_['config']['realm_url']); ?>"
+                           placeholder="https://your-keycloak.com/auth/realms/myrealm"
+                           class="cookieauth-input cookieauth-input-flex">
+                    <button type="button" id="cookieauth-test-connection" class="button">
+                        <?php p($l->t('Test')); ?>
+                    </button>
+                </div>
+                <p class="settings-hint">
+                    <?php p($l->t('Public key will be fetched automatically. Either Realm URL OR manual Public Key is required.')); ?>
+                </p>
+                <span id="cookieauth-test-result"></span>
+            </div>
         </div>
 
-        <!-- Cookie Name -->
-        <div class="form-group">
-            <label for="cookieauth-cookie-name">
-                <?php p($l->t('Cookie Name')); ?> *
-                <?php if ($_['configSources']['cookie_name'] === 'system'): ?>
-                <span class="cookieauth-source">(<?php p($l->t('from config.php')); ?>)</span>
-                <?php endif; ?>
-            </label>
-            <input type="text"
-                   id="cookieauth-cookie-name"
-                   name="cookie_name"
-                   value="<?php p($_['config']['cookie_name']); ?>"
-                   placeholder="authToken"
-                   required
-                   class="cookieauth-input">
-            <p class="settings-hint">
-                <?php p($l->t('Name of the cookie containing the JWT token.')); ?>
-            </p>
+        <!-- Section: Token Settings -->
+        <div class="cookieauth-section">
+            <h3><?php p($l->t('Token Settings')); ?></h3>
+
+            <div class="cookieauth-grid">
+                <!-- Cookie Name -->
+                <div class="form-group">
+                    <label for="cookieauth-cookie-name">
+                        <?php p($l->t('Cookie Name')); ?> *
+                        <?php if ($_['configSources']['cookie_name'] === 'system'): ?>
+                        <span class="cookieauth-source">(<?php p($l->t('config.php')); ?>)</span>
+                        <?php endif; ?>
+                    </label>
+                    <input type="text"
+                           id="cookieauth-cookie-name"
+                           name="cookie_name"
+                           value="<?php p($_['config']['cookie_name']); ?>"
+                           placeholder="authToken"
+                           required
+                           class="cookieauth-input">
+                    <p class="settings-hint">
+                        <?php p($l->t('Cookie containing JWT token')); ?>
+                    </p>
+                </div>
+
+                <!-- User Claim -->
+                <div class="form-group">
+                    <label for="cookieauth-user-claim">
+                        <?php p($l->t('User Claim')); ?> *
+                        <?php if ($_['configSources']['user_claim'] === 'system'): ?>
+                        <span class="cookieauth-source">(<?php p($l->t('config.php')); ?>)</span>
+                        <?php endif; ?>
+                    </label>
+                    <input type="text"
+                           id="cookieauth-user-claim"
+                           name="user_claim"
+                           value="<?php p($_['config']['user_claim']); ?>"
+                           placeholder="preferred_username"
+                           required
+                           class="cookieauth-input">
+                    <p class="settings-hint">
+                        <?php p($l->t('JWT claim for username matching')); ?>
+                    </p>
+                </div>
+
+                <!-- Algorithm -->
+                <div class="form-group">
+                    <label for="cookieauth-algorithm">
+                        <?php p($l->t('Algorithm')); ?>
+                        <?php if ($_['configSources']['algorithm'] === 'system'): ?>
+                        <span class="cookieauth-source">(<?php p($l->t('config.php')); ?>)</span>
+                        <?php endif; ?>
+                    </label>
+                    <select id="cookieauth-algorithm" name="algorithm" class="cookieauth-input">
+                        <?php foreach ($_['algorithms'] as $alg): ?>
+                        <option value="<?php p($alg); ?>" <?php if ($_['config']['algorithm'] === $alg) p('selected'); ?>>
+                            <?php p($alg); ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="settings-hint">
+                        <?php p($l->t('JWT signing algorithm')); ?>
+                    </p>
+                </div>
+
+                <!-- Issuer -->
+                <div class="form-group">
+                    <label for="cookieauth-issuer">
+                        <?php p($l->t('Expected Issuer')); ?>
+                        <?php if ($_['configSources']['issuer'] === 'system'): ?>
+                        <span class="cookieauth-source">(<?php p($l->t('config.php')); ?>)</span>
+                        <?php endif; ?>
+                    </label>
+                    <input type="text"
+                           id="cookieauth-issuer"
+                           name="issuer"
+                           value="<?php p($_['config']['issuer']); ?>"
+                           placeholder="<?php p($l->t('Auto-derived from Realm URL')); ?>"
+                           class="cookieauth-input">
+                    <p class="settings-hint">
+                        <?php p($l->t('JWT issuer (iss) validation')); ?>
+                    </p>
+                </div>
+            </div>
         </div>
 
-        <!-- User Claim -->
-        <div class="form-group">
-            <label for="cookieauth-user-claim">
-                <?php p($l->t('User Claim')); ?> *
-                <?php if ($_['configSources']['user_claim'] === 'system'): ?>
-                <span class="cookieauth-source">(<?php p($l->t('from config.php')); ?>)</span>
-                <?php endif; ?>
-            </label>
-            <input type="text"
-                   id="cookieauth-user-claim"
-                   name="user_claim"
-                   value="<?php p($_['config']['user_claim']); ?>"
-                   placeholder="preferred_username"
-                   required
-                   class="cookieauth-input">
-            <p class="settings-hint">
-                <?php p($l->t('JWT claim to use for matching Nextcloud users (e.g., preferred_username, sub, email).')); ?>
-            </p>
-        </div>
+        <!-- Section: Advanced Options -->
+        <details class="cookieauth-section cookieauth-advanced">
+            <summary><?php p($l->t('Advanced Options')); ?></summary>
 
-        <!-- Algorithm -->
-        <div class="form-group">
-            <label for="cookieauth-algorithm">
-                <?php p($l->t('JWT Algorithm')); ?>
-                <?php if ($_['configSources']['algorithm'] === 'system'): ?>
-                <span class="cookieauth-source">(<?php p($l->t('from config.php')); ?>)</span>
-                <?php endif; ?>
-            </label>
-            <select id="cookieauth-algorithm" name="algorithm" class="cookieauth-input">
-                <?php foreach ($_['algorithms'] as $alg): ?>
-                <option value="<?php p($alg); ?>" <?php if ($_['config']['algorithm'] === $alg) p('selected'); ?>>
-                    <?php p($alg); ?>
-                </option>
-                <?php endforeach; ?>
-            </select>
-            <p class="settings-hint">
-                <?php p($l->t('JWT signing algorithm. RS256 is the most common.')); ?>
-            </p>
-        </div>
+            <div class="cookieauth-advanced-content">
+                <!-- Public Key -->
+                <div class="form-group">
+                    <label for="cookieauth-public-key">
+                        <?php p($l->t('Manual Public Key')); ?>
+                        <?php if ($_['configSources']['public_key'] === 'system'): ?>
+                        <span class="cookieauth-source">(<?php p($l->t('from config.php')); ?>)</span>
+                        <?php endif; ?>
+                    </label>
+                    <textarea id="cookieauth-public-key"
+                              name="public_key"
+                              rows="5"
+                              placeholder="-----BEGIN PUBLIC KEY-----&#10;MIIBIjANBgkq...&#10;-----END PUBLIC KEY-----"
+                              class="cookieauth-input cookieauth-textarea"><?php p($_['config']['public_key']); ?></textarea>
+                    <p class="settings-hint">
+                        <?php p($l->t('PEM key or file path. Use instead of Realm URL for non-Keycloak setups.')); ?>
+                    </p>
+                </div>
 
-        <hr class="cookieauth-divider">
-        <h3><?php p($l->t('Advanced Options')); ?></h3>
+                <div class="cookieauth-grid">
+                    <!-- Password API URL -->
+                    <div class="form-group">
+                        <label for="cookieauth-password-api">
+                            <?php p($l->t('Password API URL')); ?>
+                            <?php if ($_['configSources']['password_api_url'] === 'system'): ?>
+                            <span class="cookieauth-source">(<?php p($l->t('config.php')); ?>)</span>
+                            <?php endif; ?>
+                        </label>
+                        <input type="url"
+                               id="cookieauth-password-api"
+                               name="password_api_url"
+                               value="<?php p($_['config']['password_api_url']); ?>"
+                               placeholder="https://api.example.com"
+                               class="cookieauth-input">
+                        <p class="settings-hint">
+                            <?php p($l->t('For SMB/external storage auth')); ?>
+                        </p>
+                    </div>
 
-        <!-- Public Key (alternative to realm URL) -->
-        <div class="form-group">
-            <label for="cookieauth-public-key">
-                <?php p($l->t('Public Key (Manual)')); ?>
-                <?php if ($_['configSources']['public_key'] === 'system'): ?>
-                <span class="cookieauth-source">(<?php p($l->t('from config.php')); ?>)</span>
-                <?php endif; ?>
-            </label>
-            <textarea id="cookieauth-public-key"
-                      name="public_key"
-                      rows="6"
-                      placeholder="-----BEGIN PUBLIC KEY-----&#10;MIIBIjANBgkq...&#10;-----END PUBLIC KEY-----"
-                      class="cookieauth-input cookieauth-textarea"><?php p($_['config']['public_key']); ?></textarea>
-            <p class="settings-hint">
-                <?php p($l->t('PEM-formatted public key OR path to public key file. Use this if not using Keycloak Realm URL.')); ?>
-            </p>
-        </div>
+                    <!-- Fallback to Email -->
+                    <div class="form-group cookieauth-checkbox-group">
+                        <label><?php p($l->t('User Lookup')); ?></label>
+                        <div class="cookieauth-checkbox-item">
+                            <input type="checkbox"
+                                   id="cookieauth-fallback-email"
+                                   name="fallback_to_email"
+                                   class="checkbox"
+                                   <?php if ($_['config']['fallback_to_email']) p('checked'); ?>>
+                            <label for="cookieauth-fallback-email">
+                                <?php p($l->t('Fallback to email lookup')); ?>
+                                <?php if ($_['configSources']['fallback_to_email'] === 'system'): ?>
+                                <span class="cookieauth-source">(<?php p($l->t('config.php')); ?>)</span>
+                                <?php endif; ?>
+                            </label>
+                        </div>
+                        <p class="settings-hint">
+                            <?php p($l->t('Try email if username not found')); ?>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </details>
 
-        <!-- Issuer -->
-        <div class="form-group">
-            <label for="cookieauth-issuer">
-                <?php p($l->t('Expected Issuer')); ?>
-                <?php if ($_['configSources']['issuer'] === 'system'): ?>
-                <span class="cookieauth-source">(<?php p($l->t('from config.php')); ?>)</span>
-                <?php endif; ?>
-            </label>
-            <input type="text"
-                   id="cookieauth-issuer"
-                   name="issuer"
-                   value="<?php p($_['config']['issuer']); ?>"
-                   placeholder="https://your-edulution-domain.com/auth/realms/edulution"
-                   class="cookieauth-input">
-            <p class="settings-hint">
-                <?php p($l->t('Expected JWT issuer (iss claim). Auto-derived from Realm URL if not set.')); ?>
-            </p>
-        </div>
-
-        <!-- Fallback to Email -->
-        <div class="form-group">
-            <input type="checkbox"
-                   id="cookieauth-fallback-email"
-                   name="fallback_to_email"
-                   class="checkbox"
-                   <?php if ($_['config']['fallback_to_email']) p('checked'); ?>>
-            <label for="cookieauth-fallback-email">
-                <?php p($l->t('Fallback to email lookup')); ?>
-                <?php if ($_['configSources']['fallback_to_email'] === 'system'): ?>
-                <span class="cookieauth-source">(<?php p($l->t('from config.php')); ?>)</span>
-                <?php endif; ?>
-            </label>
-            <p class="settings-hint">
-                <?php p($l->t('If user not found by username claim, try matching by email address.')); ?>
-            </p>
-        </div>
-
-        <!-- Password API URL -->
-        <div class="form-group">
-            <label for="cookieauth-password-api">
-                <?php p($l->t('Password API URL')); ?>
-                <?php if ($_['configSources']['password_api_url'] === 'system'): ?>
-                <span class="cookieauth-source">(<?php p($l->t('from config.php')); ?>)</span>
-                <?php endif; ?>
-            </label>
-            <input type="url"
-                   id="cookieauth-password-api"
-                   name="password_api_url"
-                   value="<?php p($_['config']['password_api_url']); ?>"
-                   placeholder="https://api.example.com"
-                   class="cookieauth-input">
-            <p class="settings-hint">
-                <?php p($l->t('Optional API to fetch user passwords for SMB/external storage authentication.')); ?>
-            </p>
-        </div>
-
-        <div class="form-group cookieauth-actions">
+        <!-- Save Button -->
+        <div class="cookieauth-actions">
             <button type="submit" id="cookieauth-save" class="primary">
                 <?php p($l->t('Save')); ?>
             </button>

@@ -3,66 +3,154 @@
  */
 
 #cookieauth-admin {
-    max-width: 900px;
+    max-width: 800px;
 }
 
 #cookieauth-admin h2 {
     display: flex;
     align-items: center;
     gap: 10px;
+    margin-bottom: 5px;
 }
 
-#cookieauth-admin h3 {
-    margin-top: 20px;
-    margin-bottom: 15px;
-    color: var(--color-text-maxcontrast);
+/* Sections */
+#cookieauth-admin .cookieauth-section {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+#cookieauth-admin .cookieauth-section:last-of-type {
+    border-bottom: none;
+}
+
+#cookieauth-admin .cookieauth-section h3 {
+    margin: 0 0 15px 0;
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--color-main-text);
+}
+
+/* Grid layout for side-by-side fields */
+#cookieauth-admin .cookieauth-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px 25px;
 }
 
 /* Form groups */
 #cookieauth-admin .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
+}
+
+#cookieauth-admin .cookieauth-grid .form-group {
+    margin-bottom: 0;
 }
 
 #cookieauth-admin .form-group label {
     display: block;
-    font-weight: bold;
-    margin-bottom: 5px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    font-size: 0.95em;
 }
 
 /* Input fields */
 #cookieauth-admin .cookieauth-input {
     width: 100%;
-    max-width: 500px;
     box-sizing: border-box;
 }
 
 #cookieauth-admin .cookieauth-textarea {
     font-family: monospace;
+    font-size: 0.9em;
     resize: vertical;
-    min-height: 120px;
+    min-height: 100px;
+}
+
+/* Input row with button */
+#cookieauth-admin .cookieauth-input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+#cookieauth-admin .cookieauth-input-flex {
+    flex: 1;
 }
 
 /* Settings hints */
 #cookieauth-admin .settings-hint {
     color: var(--color-text-maxcontrast);
-    font-size: 0.9em;
-    margin-top: 5px;
-    margin-bottom: 10px;
+    font-size: 0.85em;
+    margin: 4px 0 0 0;
+    line-height: 1.4;
 }
 
 /* Source indicators */
 #cookieauth-admin .cookieauth-source {
     font-weight: normal;
-    font-size: 0.85em;
+    font-size: 0.8em;
     color: var(--color-primary);
-    margin-left: 5px;
+    opacity: 0.8;
 }
 
-/* Divider */
-#cookieauth-admin .cookieauth-divider {
-    border: none;
+/* Advanced section (collapsible) */
+#cookieauth-admin .cookieauth-advanced {
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-large);
+    padding: 0;
+    margin-top: 10px;
+}
+
+#cookieauth-admin .cookieauth-advanced summary {
+    padding: 12px 15px;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--color-text-maxcontrast);
+    user-select: none;
+    list-style: none;
+}
+
+#cookieauth-admin .cookieauth-advanced summary::-webkit-details-marker {
+    display: none;
+}
+
+#cookieauth-admin .cookieauth-advanced summary::before {
+    content: '▶';
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 0.7em;
+    transition: transform 0.2s;
+}
+
+#cookieauth-admin .cookieauth-advanced[open] summary::before {
+    transform: rotate(90deg);
+}
+
+#cookieauth-admin .cookieauth-advanced summary:hover {
+    color: var(--color-main-text);
+}
+
+#cookieauth-admin .cookieauth-advanced-content {
+    padding: 15px;
     border-top: 1px solid var(--color-border);
-    margin: 30px 0;
+}
+
+/* Checkbox group */
+#cookieauth-admin .cookieauth-checkbox-group label:first-child {
+    margin-bottom: 8px;
+}
+
+#cookieauth-admin .cookieauth-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#cookieauth-admin .cookieauth-checkbox-item label {
+    font-weight: normal;
+    margin-bottom: 0;
+    cursor: pointer;
 }
 
 /* Notice boxes */
@@ -70,7 +158,7 @@
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    padding: 15px;
+    padding: 12px 15px;
     border-radius: var(--border-radius);
     margin-bottom: 20px;
 }
@@ -83,18 +171,29 @@
 }
 
 #cookieauth-admin .cookieauth-notice-success {
-    background-color: var(--color-success-background, #e8f5e9);
+    background-color: var(--color-success, #4caf50);
     border: 1px solid var(--color-success, #4caf50);
+    color: #fff;
+}
+
+#cookieauth-admin .cookieauth-notice-success .icon {
+    filter: invert(1);
 }
 
 #cookieauth-admin .cookieauth-notice-warning {
-    background-color: var(--color-warning-background, #fff3e0);
+    background-color: var(--color-warning, #ff9800);
     border: 1px solid var(--color-warning, #ff9800);
+    color: #000;
 }
 
 #cookieauth-admin .cookieauth-notice-error {
-    background-color: var(--color-error-background, #ffebee);
+    background-color: var(--color-error, #f44336);
     border: 1px solid var(--color-error, #f44336);
+    color: #fff;
+}
+
+#cookieauth-admin .cookieauth-notice-error .icon {
+    filter: invert(1);
 }
 
 #cookieauth-admin .cookieauth-notice ul {
@@ -111,14 +210,13 @@
     display: flex;
     align-items: center;
     gap: 15px;
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 1px solid var(--color-border);
+    margin-top: 20px;
+    padding-top: 15px;
 }
 
 /* Status messages */
 #cookieauth-admin .cookieauth-status-msg {
-    padding: 5px 10px;
+    padding: 4px 10px;
     border-radius: var(--border-radius);
     font-size: 0.9em;
 }
@@ -135,13 +233,11 @@
     color: var(--color-text-maxcontrast);
 }
 
-/* Test connection button */
-#cookieauth-test-connection {
-    margin-top: 10px;
-}
-
+/* Test result */
 #cookieauth-test-result {
-    margin-left: 10px;
+    display: block;
+    margin-top: 8px;
+    font-size: 0.9em;
 }
 
 /* Loading state */
@@ -150,24 +246,18 @@
     cursor: wait;
 }
 
-#cookieauth-admin button.loading::after {
-    content: '...';
-}
-
-/* Checkbox styling */
-#cookieauth-admin .checkbox + label {
-    display: inline;
-    font-weight: normal;
-}
-
 /* Responsive */
-@media (max-width: 600px) {
-    #cookieauth-admin .cookieauth-input {
-        max-width: 100%;
+@media (max-width: 700px) {
+    #cookieauth-admin .cookieauth-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
     }
 
-    #cookieauth-admin .cookieauth-actions {
+    #cookieauth-admin .cookieauth-input-row {
         flex-direction: column;
-        align-items: flex-start;
+    }
+
+    #cookieauth-admin .cookieauth-input-row button {
+        align-self: flex-start;
     }
 }
